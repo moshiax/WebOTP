@@ -1,0 +1,358 @@
+body {
+  background-color: #0d1117;
+  color: #c9d1d9;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+header {
+  background-color: #161b22;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 {
+  margin: 0;
+}
+
+#masterDisplay {
+  font-size: 0.9rem;
+  background-color: #21262d;
+  padding: 0.5rem;
+  border-radius: 5px;
+  margin: 0.5rem;
+}
+
+main {
+  padding: 1rem;
+}
+
+#masterKeyFormContainer {
+  padding: 1rem;
+  border-bottom: 1px solid #30363d;
+  margin-bottom: 1rem;
+}
+
+#masterKeyForm input {
+  width: calc(100% - 130px);
+  padding: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid #30363d;
+  background-color: #0d1117;
+  color: #c9d1d9;
+  margin-right: 0.5rem;
+}
+
+#masterKeyForm button {
+  background-color: #238636;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+#masterKeyForm button:hover {
+  background-color: #2ea043;
+}
+
+.key-card {
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.key-card .public-values, 
+.key-card .hidden-values {
+  margin-bottom: 0.5rem;
+  word-wrap: break-word;
+}
+
+.key-card strong {
+  display: inline-block;
+  width: 120px;
+  margin-bottom: 0.3rem;
+}
+
+.status {
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  margin-top: 0.5rem;
+  display: inline-block;
+}
+
+.status-decrypted {
+  background-color: #22863a;
+}
+
+.status-encrypted {
+  background-color: #dbab09;
+}
+
+.status-failed {
+  background-color: #d73a49;
+}
+
+button {
+  background-color: #238636;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
+  color: #ffffff;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+#clearStorageBtn {
+  background-color: #d11325; 
+  transition: background-color 0.25s ease; 
+}
+
+#clearStorageBtn:hover {
+  background-color: #ff0119;
+}
+
+#importKeysBtn:hover, 
+.addMasterKeyBtn:hover,
+#exportKeysBtn:hover,
+#manageMasterKeysBtn:hover,
+#toggleRevealMasterKeysBtn:hover,
+#addKeyBtn:hover {
+  background-color: #2ea043;
+  transition: background-color 0.25s ease; 
+}
+
+input {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid #30363d;
+  background-color: #0d1117;
+  color: #c9d1d9;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: transparent;
+  border: none;
+  color: #d73a49;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.delete-btn:hover {
+  color: #ff7b72;
+}
+
+.notification {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 20px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 10px;
+  display: none;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+  font-size: 1.5rem;
+  text-align: center;
+  z-index: 10000000;
+  animation: fadeIn 0.5s ease-in-out, fadeOut 0.5s ease-in-out 1s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.notification.show {
+  display: block;
+  opacity: 1;
+}
+
+.notification.hidden {
+  display: none;
+}
+
+#copyModal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+}
+
+#copyModalContent {
+  background: #161b22;
+  padding: 20px;
+  border-radius: 5px;
+  max-width: 500px;
+  width: 90%;
+}
+
+#copyTextArea {
+  width: 100%;
+  background: #161b22;
+  height: 150px;
+  scrollbar-width: none;
+  color: white;
+  resize: none;
+}
+
+#copyButton {
+  margin-top: 10px;
+}
+#manageMasterModal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+}
+
+#manageMasterModalContent {
+  background: #161b22;
+  padding: 20px;
+  border-radius: 5px;
+  max-width: 80%; 
+  width: auto;
+  color: #c9d1d9;
+  display: inline-block;
+  position: relative;
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+#manageMasterModal .close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #c9d1d9;
+}
+
+#masterKeysTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  overflow-x: auto;
+  table-layout: auto; 
+}
+
+#masterKeysTable th,
+#masterKeysTable td {
+  border: 1px solid #30363d;
+  padding: 8px;
+  text-align: left;
+  word-wrap: break-word; 
+}
+
+#masterKeysTable th {
+  background-color: #21262d;
+}
+
+#masterKeysTable td {
+  background-color: #161b22;
+}
+
+#masterKeysTable button {
+  background-color: #d73a49;
+  border: none;
+  padding: 0.3rem 0.5rem;
+  border-radius: 5px;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+#masterKeysTable button:hover {
+  background-color: #ff7b72;
+}
+
+@media (max-width: 768px) {
+  #manageMasterModalContent {
+    width: 90%;  
+  }
+
+  #masterKeysTable {
+    max-width: 100%;  
+    overflow-x: auto; 
+    display: block;  
+  }
+
+  #masterKeysTable th,
+  #masterKeysTable td {
+    padding: 5px; 
+  }
+
+  #masterKeysTable button, {
+    padding: 0.2rem 0.4rem; 
+  }
+}
+
+.status-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.otp-progress-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 20px;
+    vertical-align: middle;
+    width: 40px;
+    height: 40px;
+}
+.progress-container {
+    position: relative;
+    width: 40px;
+    height: 40px;
+}
+.progress-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #eee;
+}
+.progress-fill {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: conic-gradient(#3498db 360deg, transparent 0deg);
+}
