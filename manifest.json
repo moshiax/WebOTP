@@ -1,16 +1,15 @@
 {
-  "name": "WebOTP",
   "short_name": "WebOTP",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#161b22",
-  "description": "OTP keys manager.",
+  "name": "WebOTP",
   "icons": [
     {
       "src": "icon.png",
       "sizes": "480x480",
       "type": "image/png"
     }
-  ]
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#161b22"
 }
