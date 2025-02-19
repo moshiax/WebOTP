@@ -685,6 +685,11 @@
           localStorage.removeItem("authKeys");
           localStorage.removeItem("masterKeys");
           history.replaceState(null, "", window.location.pathname);
+          loadKeys();
+          loadMasterKeys();
+		  updateMasterDisplay();
+		  updateDecryptionForKeys();
+		  renderKeys();
         });
         document
           .getElementById("closeManageMasterModal")
