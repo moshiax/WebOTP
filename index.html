@@ -15,21 +15,23 @@
     </header>
     <main>
       <div id="keysContainer"></div>
-<div id="buttonsContainer">
-  <button id="addKeyBtn">Add key</button>
-  <button class="addMasterKeyBtn">Add master key</button>
-  <button id="manageMasterKeysBtn">Manage Master Keys</button>
-  <div class="split-button" id="exportSplitBtn">
-    <div class="left" id="exportTextBtn">Export Text</div>
-    <div class="right" id="exportFileBtn">Export File</div>
-  </div>
-  <div class="split-button" id="importSplitBtn">
-    <div class="left" id="importTextBtn">Import Text</div>
-    <div class="right" id="importFileBtn">Import File</div>
-  </div>
-  <button id="clearStorageBtn">Clear All Data</button>
-</div>
-
+      <div>
+        <button id="addKeyBtn">Add key</button>
+        <button class="addMasterKeyBtn">Add master key</button>
+        <button id="manageMasterKeysBtn">Manage Master Keys</button>
+      </div>
+      <br />
+      <div>
+        <div class="split-button" id="exportSplitBtn">
+          <div class="left" id="exportTextBtn">Export Text</div>
+          <div class="right" id="exportFileBtn">Export File</div>
+        </div>
+        <div class="split-button" id="importSplitBtn">
+          <div class="left" id="importTextBtn">Import Text</div>
+          <div class="right" id="importFileBtn">Import File</div>
+        </div>
+        <button id="clearStorageBtn">Clear All Data</button>
+      </div>
     </main>
     <div id="notification" class="notification">
       <p></p>
@@ -63,6 +65,16 @@
     </div>
     <script src="crypto.js"></script>
     <script>
+      // ================================
+      // Serviceworker
+      // ================================
+      
+		if ('serviceWorker' in navigator) {
+			navigator.serviceWorker.register('/sw.js')
+				.then(() => console.log('sw registered'))
+				.catch((error) => console.error('sw er:', error));
+		}
+
       // ================================
       // Notifications
       // ================================
