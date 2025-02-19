@@ -23,11 +23,11 @@
       <br />
       <div>
         <div class="split-button" id="exportSplitBtn">
-          <div class="left" id="exportTextBtn">Export Text</div>
+          <div class="left" id="exportTextBtn">Export String</div>
           <div class="right" id="exportFileBtn">Export File</div>
         </div>
         <div class="split-button" id="importSplitBtn">
-          <div class="left" id="importTextBtn">Import Text</div>
+          <div class="left" id="importTextBtn">Import String</div>
           <div class="right" id="importFileBtn">Import File</div>
         </div>
         <button id="clearStorageBtn">Clear All Data</button>
@@ -272,7 +272,7 @@
 	  const hiddenDiv = document.createElement("div");
 	  hiddenDiv.className = "hidden-values";
 	  hiddenDiv.innerHTML =
-		"<strong>SHA256 of password:</strong> " + keyObj.encryptionHash;
+		"<strong>Master key SHA256:</strong> " + keyObj.encryptionHash;
 	  card.appendChild(hiddenDiv);
 
 	  return card;
