@@ -14,19 +14,32 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('fetch', (event) => {
     event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) {
-                return cachedResponse;
-            }
-            return fetch(event.request).then((networkResponse) => {
-                if (event.request.method === 'GET' && networkResponse.ok) {
-                    return caches.open('v1').then((cache) => {
-                        cache.put(event.request, networkResponse.clone());
-                        return networkResponse;
+        fetch(event.request)
+            .then((response) => {
+                // Check for successful response status
+                if (event.request.method === 'GET' && response.status === 200) {
+                    const clonedResponse = response.clone();
+                    caches.open('v1').then((cache) => {
+                        cache.put(event.request, clonedResponse).catch((cacheError) => {
+                            console.error('Error while saving to cache:', cacheError);
+                        });
                     });
                 }
-                return networkResponse;
-            });
-        })
+                return response;
+            })
+            .catch((fetchError) => {
+                console.error('Error during fetch:', fetchError);
+                return caches.match(event.request)
+                    .then((cacheResponse) => {
+                        if (cacheResponse) {
+                            return cacheResponse;
+                        } else {
+                            return new Response('Error loading and no data in cache', {
+                                status: 500,
+                                statusText: 'Internal Server Error'
+                            });
+                        }
+                    });
+            })
     );
 });
