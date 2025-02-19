@@ -16,7 +16,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         fetch(event.request)
             .then((response) => {
-                // Check for successful response status
                 if (event.request.method === 'GET' && response.status === 200) {
                     const clonedResponse = response.clone();
                     caches.open('v1').then((cache) => {
