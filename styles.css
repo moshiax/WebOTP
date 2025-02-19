@@ -89,6 +89,7 @@ main {
 
 .status-decrypted {
   background-color: #22863a;
+  cursor: pointer;
 }
 
 .status-encrypted {
