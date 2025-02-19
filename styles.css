@@ -111,12 +111,12 @@ button {
   margin-top: 0.5rem;
 }
 
-#clearStorageBtn {
+#clearStorageBtn, #disableEncBtn {
   background-color: #d11325; 
   transition: background-color 0.25s ease; 
 }
 
-#clearStorageBtn:hover {
+#clearStorageBtn:hover, #disableEncBtn:hover {
   background-color: #ff0119;
 }
 
@@ -400,3 +400,15 @@ input {
 .split-button .left:hover, .split-button .right:hover {
   background:#384557;
 }
+
+#encControls {
+  margin-top: 10px;
+}
+#encControls span {
+  font-weight: bold;
+  margin-right: 10px;
+}
+#encControls button {
+  margin-right: 5px;
+}
+
