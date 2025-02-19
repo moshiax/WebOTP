@@ -6,11 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WebOTP</title>
     <link rel="stylesheet" href="styles.css" />
-    <style>
-      .master-key-cell {
-        cursor: pointer;
-      }
-    </style>
   </head>
   <body>
     <header>
@@ -19,17 +14,21 @@
     </header>
     <main>
       <div id="keysContainer"></div>
-      <div>
-        <button id="addKeyBtn">Add key</button>
-        <button class="addMasterKeyBtn">Add master key</button>
-        <button id="manageMasterKeysBtn">Manage Master Keys</button>
-      </div>
-      <br />
-      <div>
-        <button id="exportKeysBtn">Export data</button>
-        <button id="importKeysBtn">Import data</button>
-        <button id="clearStorageBtn">Clear All Data</button>
-      </div>
+<div id="buttonsContainer">
+  <button id="addKeyBtn">Add key</button>
+  <button class="addMasterKeyBtn">Add master key</button>
+  <button id="manageMasterKeysBtn">Manage Master Keys</button>
+  <div class="split-button" id="exportSplitBtn">
+    <div class="left" id="exportTextBtn">Export Text</div>
+    <div class="right" id="exportFileBtn">Export File</div>
+  </div>
+  <div class="split-button" id="importSplitBtn">
+    <div class="left" id="importTextBtn">Import Text</div>
+    <div class="right" id="importFileBtn">Import File</div>
+  </div>
+  <button id="clearStorageBtn">Clear All Data</button>
+</div>
+
     </main>
     <div id="notification" class="notification">
       <p></p>
@@ -508,7 +507,7 @@
       // Export and import
       // ================================
       
-      async function exportAllData() {
+      async function exportData(toFile = false) {
         const combined = { keys, masterKeys };
         const combinedString = JSON.stringify(combined);
         const combinedBase64 = base64EncodeUnicode(combinedString);
@@ -517,25 +516,58 @@
         try {
           const encrypted = await encryptText(combinedBase64, password);
           const finalExport = base64EncodeUnicode(encrypted);
-          try {
-            await navigator.clipboard.writeText(finalExport);
-            alert("Data successfully exported and copied to clipboard!");
-          } catch (err) {
-            showCopyModal(finalExport);
+          if (toFile) {
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, "-");
+            const filename = `${timestamp}.keystore`;
+            const blob = new Blob([finalExport], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            alert("Data exported to file: " + filename);
+          } else {
+            try {
+              await navigator.clipboard.writeText(finalExport);
+              alert("Data successfully exported and copied to clipboard!");
+            } catch {
+              showCopyModal(finalExport);
+            }
           }
         } catch (e) {
           alert("Error exporting data: " + e.message);
         }
       }
       
-      async function importAllData() {
-        const input = prompt("Paste the string to import data:");
-        if (!input) return;
-        const trimmedInput = input.trim();
+      async function importData(fromFile = false) {
+        let input;
+        if (fromFile) {
+          const fileInput = document.createElement("input");
+          fileInput.type = "file";
+          fileInput.accept = ".keystore, text/plain";
+          fileInput.onchange = async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async () => {
+              await processImport(reader.result);
+            };
+            reader.readAsText(file);
+          };
+          fileInput.click();
+        } else {
+          input = prompt("Paste the string to import data:");
+          if (input) await processImport(input.trim());
+        }
+      }
+      
+      async function processImport(input) {
         const password = prompt("Enter password for importing data:");
         if (!password) return;
         try {
-          const encrypted = base64DecodeUnicode(trimmedInput);
+          const encrypted = base64DecodeUnicode(input);
           const decryptedBase64 = await decryptText(encrypted, password);
           const combinedString = base64DecodeUnicode(decryptedBase64);
           const combined = JSON.parse(combinedString);
@@ -624,8 +656,11 @@
           button.addEventListener("click", addMasterKey);
         });
         document.getElementById("manageMasterKeysBtn").addEventListener("click", openManageMasterModal);
-        document.getElementById("exportKeysBtn").addEventListener("click", exportAllData);
-        document.getElementById("importKeysBtn").addEventListener("click", importAllData);
+        document.getElementById("exportTextBtn").addEventListener("click", () => exportData(false));
+        document.getElementById("exportFileBtn").addEventListener("click", () => exportData(true));
+        document.getElementById("importTextBtn").addEventListener("click", () => importData(false));
+        document.getElementById("importFileBtn").addEventListener("click", () => importData(true));
+      
         document.getElementById("clearStorageBtn").addEventListener("click", function () {
           if (
             !confirm(
