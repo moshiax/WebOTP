@@ -1,13 +1,13 @@
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open('v1').then((cache) => {
-            return cache.addAll([
-                '/',
-                '/index.html',
-                '/styles.css',
-                '/crypto.js',
-                '/icon.png'
-            ]);
+        caches.open('v1').then(async (cache) => {
+            for (let url of ['index.html', 'styles.css', 'crypto.js', 'icon.png']) {
+                try {
+                    await cache.add(url);
+                } catch (e) {
+                    console.error(`caching error: ${url}`, e);
+                }
+            }
         })
     );
 });
