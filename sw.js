@@ -14,17 +14,19 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('fetch', (event) => {
     event.respondWith(
-        fetch(event.request)
-            .then((response) => {
-                if (event.request.method === 'GET') {
-                    caches.open('v1').then((cache) => {
-                        cache.put(event.request, response.clone());
+        caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            return fetch(event.request).then((networkResponse) => {
+                if (event.request.method === 'GET' && networkResponse.ok) {
+                    return caches.open('v1').then((cache) => {
+                        cache.put(event.request, networkResponse.clone());
+                        return networkResponse;
                     });
                 }
-                return response;
-            })
-            .catch(() => {
-                return caches.match(event.request);
-            })
+                return networkResponse;
+            });
+        })
     );
 });
