@@ -377,7 +377,7 @@ input {
 }
 
 .split-button .left, .split-button .right {
-    font-family: Arial;
+    font-family: Arial, sans-serif;
     padding: 0.5rem 1rem;
     text-align: center;
     font-size: 13.333px;
