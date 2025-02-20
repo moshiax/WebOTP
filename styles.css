@@ -502,3 +502,24 @@ dialog#customPromptDialog button#customPromptOk:disabled {
     cursor: not-allowed;
 }
 
+@media (max-width: 768px) {
+  #keysContainer {
+    margin-bottom: 20px;
+  }
+
+  #keysContainer button {
+    margin: 5px;
+  }
+
+  #buttonContainer {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  #buttonContainer > button {
+    display: inline-block;
+    width: calc(50% - 10px);
+    box-sizing: border-box;
+  }
+}
+

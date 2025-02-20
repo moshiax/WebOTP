@@ -14,14 +14,14 @@
       <div id="encControls"></div>
     </header>
     <main>
-      <div id="keysContainer"></div>
-      <div>
-        <button id="addKeyBtn">Add key</button>
-        <button class="addMasterKeyBtn">Add master key</button>
-        <button id="manageMasterKeysBtn">My master keys</button>
-        <button id="managesecretKeysBtn">My secret keys</button>
-      </div>
-      <br />
+<div id="keysContainer"></div>
+<div id="buttonContainer">
+  <button id="addKeyBtn">Add key</button>
+  <button class="addMasterKeyBtn">Add master key</button>
+  <button id="manageMasterKeysBtn">My master keys</button>
+  <button id="managesecretKeysBtn">My secret keys</button>
+</div>
+      <br/>
       <div>
         <div class="split-button" id="exportSplitBtn">
           <div class="left" id="exportTextBtn">Export String</div>
@@ -544,7 +544,9 @@ function rendersecretKeysTable() {
     tr.appendChild(tdKey);
 
     const tdHash = document.createElement("td");
-    tdHash.textContent = keyObj.encryptionHash;
+    const hashToDisplay =
+      window.innerWidth < 768 ? keyObj.encryptionHash.slice(0, 15) + "..." : keyObj.encryptionHash;
+    tdHash.textContent = hashToDisplay;
     tr.appendChild(tdHash);
 
     const tdActions = document.createElement("td");
