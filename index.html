@@ -552,7 +552,7 @@ function rendersecretKeysTable() {
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete";
     delBtn.onclick = function () {
-      deleteKey(keyObj, idx);
+      deleteKey(keyObj);
     };
     tdActions.appendChild(delBtn);
     tr.appendChild(tdActions);
