@@ -11,7 +11,6 @@
   <body>
     <header>
       <h1>WebOTP</h1>
-      <div id="masterDisplay"></div>
       <div id="encControls"></div>
     </header>
     <main>
@@ -20,6 +19,7 @@
         <button id="addKeyBtn">Add key</button>
         <button class="addMasterKeyBtn">Add master key</button>
         <button id="manageMasterKeysBtn">My master keys</button>
+        <button id="managesecretKeysBtn">My secret keys</button>
       </div>
       <br />
       <div>
@@ -62,835 +62,871 @@
           <button class="addMasterKeyBtn">Add master key</button>
           <button id="toggleRevealMasterKeysBtn">Reveal master keys</button>
         </div>
+        <div id="masterEncryptionControls" style="text-align: center; margin-top: 10px;"></div>
       </div>
     </div>
+    <div id="managesecretKeysModal" class="modal">
+      <div id="managesecretKeysModalContent" class="modal-content">
+        <span id="closeManagesecretKeysModal" class="close">&times;</span>
+        <h2 style="text-align: center;">Secret Keys</h2>
+        <table id="secretKeysTable">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Masterkey SHA256</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div style="text-align: center; margin-top: 20px;">
+          <button id="toggleRevealsecretKeysBtn">Reveal secret keys</button>
+        </div>
+      </div>
+    </div>
+    <dialog id="customPromptDialog">
+      <form method="dialog">
+        <p id="customPromptText"></p>
+        <input type="text" id="customPromptInput" autocomplete="off" />
+        <div style="text-align: center;">
+          <button type="submit" id="customPromptOk">OK</button>
+          <button type="button" id="customPromptCancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
     <script src="crypto.js"></script>
-    <script>
-      // ================================
-      // Serviceworker
-      // ================================
-	  
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker
-          .register("sw.js")
-          .then(() => console.log("sw registered"))
-          .catch((error) => console.error("sw error:", error));
-      }
+    <script src ="essentials.js"></script>
+	<script>
+// ================================
+// localStorage management
+// ================================
+let masterKeys = [];
+let keys = [];
+let masterKeysRevealed = false;
+let sessionEncKey = null;
+let secretKeysRevealed = false;
 
-      // ================================
-      // URL Updater
-      // ================================
-	  
-      function updateURL() {
-        const data = JSON.stringify(keys);
-        const base64Data = base64EncodeUnicode(data);
-        const newURL =
-          window.location.origin +
-          window.location.pathname +
-          "#keys=" +
-          base64Data;
-        history.replaceState(null, "", newURL);
-      }
+function loadKeys() {
+  let fromUrl = getKeysFromURL();
+  const stored = localStorage.getItem("authKeys");
+  if (stored) {
+    keys = JSON.parse(stored);
+    keys.forEach(key => {
+      delete key.decryptedSecret;
+      delete key.status;
+    });
+    if (fromUrl) {
+      mergeKeys(fromUrl);
+    }
+  } else if (fromUrl) {
+    keys = fromUrl;
+    localStorage.setItem("authKeys", JSON.stringify(keys));
+  } else {
+    keys = [];
+  }
+  updateURL();
+}
 
-      function getKeysFromURL() {
-        if (window.location.hash.startsWith("#keys=")) {
-          try {
-            return JSON.parse(
-              base64DecodeUnicode(window.location.hash.substring(6))
-            );
-          } catch (e) {
-            console.error("Error reading keys from URL:", e);
-          }
-        }
-        return null;
-      }
-	  
-      // ================================
-      // Notifications
-      // ================================
-      function showNotification(message) {
-        const n = document.getElementById("notification");
-        n.querySelector("p").innerHTML = message;
-        n.style.display = "block";
-        n.style.animation = "fadeIn 0.5s ease-in-out";
-        setTimeout(() => {
-          n.style.animation = "fadeOut 0.5s ease-in-out";
-          setTimeout(() => {
-            n.style.display = "none";
-          }, 500);
-        }, 2300);
-      }
-      window.alert = function (message) {
-        showNotification(message);
-      };
+function mergeKeys(fromUrl) {
+  for (const keyObj of fromUrl) {
+    if (!keys.find((k) => k.id === keyObj.id)) {
+      keys.push(keyObj);
+    }
+  }
+  localStorage.setItem("authKeys", JSON.stringify(keys));
+}
 
-      // ================================
-      // localStorage management
-      // ================================
-	  
-      let masterKeys = [];
-      let keys = [];
-      let masterKeysRevealed = false;
-      let sessionEncKey = null;
+function saveKeys() {
+  const keysToStore = keys.map(({ decryptedSecret, status, ...rest }) => rest);
+  localStorage.setItem("authKeys", JSON.stringify(keysToStore));
+  updateURL();
+}
 
-
-	function loadKeys() {
-	  let fromUrl = getKeysFromURL();
-	  const stored = localStorage.getItem("authKeys");
-	  if (stored) {
-		keys = JSON.parse(stored);
-		keys.forEach(key => {
-		  delete key.decryptedSecret;
-		  delete key.status;
-		});
-		if (fromUrl) {
-		  mergeKeys(fromUrl);
-		}
-	  } else if (fromUrl) {
-		keys = fromUrl;
-		localStorage.setItem("authKeys", JSON.stringify(keys));
-	  } else {
-		keys = [];
-	  }
-	  updateURL();
-	}
-
-	function mergeKeys(fromUrl) {
-	  for (const keyObj of fromUrl) {
-		if (!keys.find((k) => k.id === keyObj.id)) {
-		  keys.push(keyObj);
-		}
-	  }
-	  localStorage.setItem("authKeys", JSON.stringify(keys));
-	}
-
-
-	function saveKeys() {
-	  const keysToStore = keys.map(({ decryptedSecret, status, ...rest }) => rest);
-	  localStorage.setItem("authKeys", JSON.stringify(keysToStore));
-	  updateURL();
-	}
-
-	async function loadMasterKeys() {
-	  const storedEncHash = localStorage.getItem("masterKeysEncKeyHash");
-	  if (storedEncHash) {
-		let validKey = false;
-		while (!validKey) {
-		  sessionEncKey = prompt(
-			"Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)"
-		  );
-		  if (!sessionEncKey) {
-			if (confirm("No key entered. Do you want to reset master keys?")) {
-			  localStorage.removeItem("masterKeys");
-			  localStorage.removeItem("masterKeysEncKeyHash");
-			  masterKeys = [];
-			  sessionEncKey = null;
-			  break;
-			} else {
-			  continue;
-			}
-		  }
-		  if (sessionEncKey === "CLEAR MASTERKEYS") {
-			localStorage.removeItem("masterKeys");
-			localStorage.removeItem("masterKeysEncKeyHash");
-			masterKeys = [];
-			sessionEncKey = null;
-			break;
-		  }
-		  const hashOfSessionKey = await sha256(sessionEncKey);
-		  if (hashOfSessionKey !== storedEncHash) {
-			continue;
-		  } else {
-			validKey = true;
-			const encryptedMasterKeys = localStorage.getItem("masterKeys");
-			try {
-			  const decryptedJSON = await decryptText(encryptedMasterKeys, sessionEncKey);
-			  masterKeys = JSON.parse(decryptedJSON);
-			} catch (e) {
-			  alert("Error decrypting master keys: " + e.message);
-			  masterKeys = [];
-			}
-		  }
-		}
-	  } else {
-		const stored = localStorage.getItem("masterKeys");
-		masterKeys = stored ? JSON.parse(stored) : [];
-	  }
-	  updateURL();
-	  updateEncControls();
-	}
-
-
-	async function saveMasterKeys() {
-	  if (sessionEncKey) {
-		const jsonData = JSON.stringify(masterKeys);
-		try {
-		  const encrypted = await encryptText(jsonData, sessionEncKey);
-		  localStorage.setItem("masterKeys", encrypted);
-		  const hashOfSessionKey = await sha256(sessionEncKey);
-		  localStorage.setItem("masterKeysEncKeyHash", hashOfSessionKey);
-		} catch (e) {
-		  alert("Error encrypting master keys: " + e.message);
-		}
-	  } else {
-		localStorage.setItem("masterKeys", JSON.stringify(masterKeys));
-		localStorage.removeItem("masterKeysEncKeyHash");
-	  }
-	  updateURL();
-	}
-
-	async function enableMasterKeysEncryption() {
-	  const newKey = prompt("Enter the key to encrypt master keys:");
-	  if (!newKey) return;
-	  sessionEncKey = newKey;
-	  await saveMasterKeys();
-	  alert("Master keys are now encrypted.");
-	  updateEncControls();
-	}
-
-	async function changeMasterKeysEncryptionKey() {
-	  const currentKey = prompt("Enter the current master keys encryption key:");
-	  if (!currentKey) return;
-	  const currentHash = await sha256(currentKey);
-	  const storedHash = localStorage.getItem("masterKeysEncKeyHash");
-	  if (currentHash !== storedHash) {
-		alert("Incorrect current key.");
-		return;
-	  }
-	  const newKey = prompt("Enter a new key for encrypting master keys:");
-	  if (!newKey) return;
-	  sessionEncKey = newKey;
-	  await saveMasterKeys();
-	  alert("Master keys encryption key successfully changed.");
-	  updateEncControls();
-	}
-
-
-	async function disableMasterKeysEncryption() {
-	  if (
-		!confirm(
-		  "Are you sure you want to disable encryption of master keys? They will be stored in plaintext."
-		)
-	  ) {
-		return;
-	  }
-	  const decryptedKeys = masterKeys;
-	  sessionEncKey = null;
-	  masterKeys = decryptedKeys;
-	  await saveMasterKeys();
-	  alert("Encryption of master keys disabled.");
-	  updateEncControls();
-	}
-
-      // ================================
-      // UI Functions
-      // ================================
-	function updateMasterDisplay() {
-	  const d = document.getElementById("masterDisplay");
-	  d.textContent =
-		masterKeys.length === 0
-		  ? "No master keys"
-		  : "Masters: " +
-			masterKeys
-			  .map(
-				(mk) =>
-				  mk.hash.substring(0, 6) +
-				  " (" +
-				  mk.password.substring(0, 4) +
-				  "...)"
-			  )
-			  .join(", ");
-	}
-
-	function updateEncControls() {
-	  const controlsDiv = document.getElementById("encControls");
-	  controlsDiv.innerHTML = "";
-	  const indicator = document.createElement("span");
-	  indicator.id = "encIndicator";
-	  if (sessionEncKey) {
-		indicator.textContent = "Master keys encryption: ENABLED";
-		indicator.style.color = "green";
-		controlsDiv.appendChild(indicator);
-
-		const changeBtn = document.createElement("button");
-		changeBtn.id = "changeEncKeyBtn";
-		changeBtn.textContent = "Change encryption key";
-		changeBtn.addEventListener("click", changeMasterKeysEncryptionKey);
-		controlsDiv.appendChild(changeBtn);
-
-		const disableBtn = document.createElement("button");
-		disableBtn.id = "disableEncBtn";
-		disableBtn.textContent = "Disable encryption";
-		disableBtn.addEventListener("click", disableMasterKeysEncryption);
-		controlsDiv.appendChild(disableBtn);
-	  } else {
-		indicator.textContent = "Master keys encryption: DISABLED";
-		indicator.style.color = "red";
-		controlsDiv.appendChild(indicator);
-
-		const enableBtn = document.createElement("button");
-		enableBtn.id = "enableEncBtn";
-		enableBtn.textContent = "Enable master keys encryption";
-		enableBtn.addEventListener("click", enableMasterKeysEncryption);
-		controlsDiv.appendChild(enableBtn);
-	  }
-	}
-
-	function createKeyCard(keyObj) {
-	  const card = document.createElement("div");
-	  card.className = "key-card";
-	  card.id = "key-" + keyObj.id;
-
-	  const delBtn = document.createElement("button");
-	  delBtn.className = "delete-btn";
-	  delBtn.innerHTML = "&times;";
-	  delBtn.title = "Delete this key";
-	  delBtn.onclick = () => {
-		if (confirm("Are you sure you want to delete this key?")) {
-		  keys = keys.filter((k) => k.id !== keyObj.id);
-		  saveKeys();
-		  renderKeys();
-		  updateAllKeyCards();
-		}
-	  };
-	  card.appendChild(delBtn);
-
-	  const publicDiv = document.createElement("div");
-	  publicDiv.className = "public-values";
-
-	  const titleDiv = document.createElement("div");
-	  titleDiv.className = "title";
-	  titleDiv.innerHTML =
-		'<strong>Name:</strong> <span class="editable-title" data-key-id="' +
-		keyObj.id +
-		'" contenteditable="true" spellcheck="false">' +
-		keyObj.title +
-		"</span>";
-	  publicDiv.appendChild(titleDiv);
-
-	  const otpDiv = document.createElement("div");
-	  otpDiv.className = "otp";
-	  otpDiv.innerHTML =
-		'<strong>OTP:</strong> <span id="otp-' + keyObj.id + '">N/A</span>';
-	  publicDiv.appendChild(otpDiv);
-
-	  const statusWrapper = document.createElement("div");
-	  statusWrapper.className = "status-wrapper";
-
-	  const statusContainer = document.createElement("div");
-	  statusContainer.className = "status-container";
-
-	  const statusLabel = document.createElement("strong");
-	  statusLabel.textContent = "Status:";
-
-	  const statusSpan = document.createElement("span");
-	  statusSpan.id = "status-" + keyObj.id;
-	  statusSpan.className = "status";
-	  statusSpan.textContent = "Unknown";
-	  statusSpan.setAttribute("data-key-id", keyObj.id);
-	  statusSpan.addEventListener("click", async function () {
-		const id = this.getAttribute("data-key-id");
-		const key = keys.find((k) => k.id === id);
-		if (!key) return;
-		const mk = getMatchingMasterKey(key);
-		if (mk) {
-		  try {
-			const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
-			await navigator.clipboard.writeText(decryptedSecret);
-			alert("Secret copied to clipboard!");
-		  } catch (e) {
-			alert("Copy failed: " + e.message);
-		  }
-		}
-	  });
-
-	  statusContainer.appendChild(statusLabel);
-	  statusContainer.appendChild(statusSpan);
-	  statusWrapper.appendChild(statusContainer);
-
-	  const progressContainer = document.createElement("div");
-	  progressContainer.className = "otp-progress-container";
-	  progressContainer.innerHTML = `
-		<div class="progress-container">
-		  <div class="progress-circle"></div>
-		  <div class="progress-fill" id="progress-${keyObj.id}"></div>
-		</div>
-	  `;
-	  statusWrapper.appendChild(progressContainer);
-
-	  publicDiv.appendChild(statusWrapper);
-	  card.appendChild(publicDiv);
-
-	  const hiddenDiv = document.createElement("div");
-	  hiddenDiv.className = "hidden-values";
-	  hiddenDiv.innerHTML =
-		"<strong>Master key SHA256:</strong> " + keyObj.encryptionHash;
-	  card.appendChild(hiddenDiv);
-	  return card;
-	}
-
-	function renderKeys() {
-	  const container = document.getElementById("keysContainer");
-	  container.innerHTML = "";
-	  keys.forEach((keyObj) => {
-		container.appendChild(createKeyCard(keyObj));
-	  });
-	  attachEditableTitleListeners();
-	}
-
-	function attachEditableTitleListeners() {
-	  const editableTitles = document.querySelectorAll(".editable-title");
-	  editableTitles.forEach((span) => {
-		span.addEventListener("blur", function () {
-		  const keyId = this.getAttribute("data-key-id");
-		  const keyObj = keys.find((k) => k.id === keyId);
-		  if (keyObj) {
-			const newTitle = this.textContent.trim();
-			if (newTitle && newTitle !== keyObj.title) {
-			  keyObj.title = newTitle;
-			  saveKeys();
-			  updateAllKeyCards();
-			}
-		  }
-		});
-		span.addEventListener("keydown", function (e) {
-		  if (e.key === "Enter") {
-			e.preventDefault();
-			this.blur();
-		  }
-		});
-	  });
-	}
-
-      // ================================
-      // UI Updates
-      // ================================
-	  
-	function startOTPUpdater() {
-	  const now = Date.now();
-	  const nextUpdate = 30000 - (now % 30000);
-	  updateAllKeyCards();
-	  setTimeout(() => {
-		updateAllKeyCards();
-		setInterval(updateAllKeyCards, 30000);
-	  }, nextUpdate);
-	}
-
-	function updateProgressCircles() {
-	  const now = Date.now();
-	  const elapsed = now % 30000;
-	  const remaining = 30000 - elapsed;
-	  const angle = (remaining / 30000) * 360;
-	  document.querySelectorAll(".progress-fill").forEach(function (elem) {
-		elem.style.background = `conic-gradient(#58a6ff ${angle}deg, #161b22 ${angle}deg)`;
-	  });
-	  requestAnimationFrame(updateProgressCircles);
-	}
-
-      // ================================
-      // OTP Functions
-      // ================================
-	function getMatchingMasterKey(keyObj) {
-	  return masterKeys.find((mk) => mk.hash === keyObj.encryptionHash);
-	}
-
-	async function updateKeyCard(keyObj) {
-	  const otpSpan = document.getElementById("otp-" + keyObj.id);
-	  const statusSpan = document.getElementById("status-" + keyObj.id);
-	  const mk = getMatchingMasterKey(keyObj);
-	  if (mk) {
-		try {
-		  const decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
-		  const otp = await generateOTP(decryptedSecret);
-		  otpSpan.textContent = otp;
-		  statusSpan.textContent = "Decrypted";
-		  statusSpan.className = "status status-decrypted";
-		} catch (e) {
-		  otpSpan.textContent = "N/A";
-		  statusSpan.textContent = "Decryption error";
-		  statusSpan.className = "status status-failed";
-		}
-	  } else {
-		otpSpan.textContent = "N/A";
-		statusSpan.textContent = "Encrypted";
-		statusSpan.className = "status status-encrypted";
-	  }
-	}
-
-	async function updateAllKeyCards() {
-	  keys.forEach((keyObj) => updateKeyCard(keyObj));
-	}
-
-      
-      async function updateDecryptionForKeys() {
-        if (masterKeys.length === 0) {
-          keys.forEach((keyObj) => (keyObj.status = "encrypted"));
-          return;
-        }
-        for (const keyObj of keys) {
-          const mk = getMatchingMasterKey(keyObj);
-          if (mk) {
-            if (keyObj.decryptedSecret) {
-              keyObj.status = "decrypted";
-            } else {
-              keyObj.status = await decryptKey(keyObj, mk);
-            }
-          } else {
-            keyObj.status = "encrypted";
-          }
-        }
-      }
-
-      async function decryptKey(keyObj, mk) {
-        try {
-          keyObj.decryptedSecret = await decryptText(
-            keyObj.encryptedKey,
-            mk.password
-          );
-          return "decrypted";
-        } catch {
-          return "failed";
-        }
-      }
-
-      // ================================
-      // Modals
-      // ================================
-      
-      function showCopyModal(text) {
-        const modal = document.getElementById("copyModal");
-        const textarea = document.getElementById("copyTextArea");
-        textarea.value = text;
-        modal.style.display = "flex";
-      }
-      
-      function openManageMasterModal() {
-        renderMasterKeysTable();
-        document.getElementById("manageMasterModal").style.display = "flex";
-      }
-      
-      function closeManageMasterModal() {
-        document.getElementById("manageMasterModal").style.display = "none";
-      }
-      
-      function renderMasterKeysTable() {
-        const tbody = document.querySelector("#masterKeysTable tbody");
-        tbody.innerHTML = "";
-        masterKeys.forEach((mk, idx) => {
-          const usageCount = keys.filter(
-            (keyObj) => keyObj.encryptionHash === mk.hash
-          ).length;
-          const tr = document.createElement("tr");
-      
-          const tdMasterKey = document.createElement("td");
-          tdMasterKey.className = "master-key-cell";
-          if (masterKeysRevealed) {
-            tdMasterKey.textContent = mk.password;
-          } else {
-            tdMasterKey.textContent = "Click to copy key";
-          }
-          tdMasterKey.addEventListener("click", async function () {
-            try {
-              await navigator.clipboard.writeText(mk.password);
-              alert("Master key copied to clipboard!");
-            } catch (e) {
-              alert("Copy failed: " + e.message);
-            }
-          });
-          tr.appendChild(tdMasterKey);
-      
-          const hashToDisplay =
-            window.innerWidth < 768 ? mk.hash.slice(0, 15) + "..." : mk.hash;
-          const tdHash = document.createElement("td");
-          tdHash.textContent = hashToDisplay;
-          tr.appendChild(tdHash);
-      
-          const tdUsage = document.createElement("td");
-          tdUsage.textContent = usageCount;
-          tr.appendChild(tdUsage);
-      
-          const tdActions = document.createElement("td");
-          const delBtn = document.createElement("button");
-          delBtn.textContent = "Delete";
-          delBtn.onclick = function () {
-            if (confirm("Delete this master key?")) {
-              masterKeys.splice(idx, 1);
-              saveMasterKeys();
-              updateMasterDisplay();
-              renderMasterKeysTable();
-              updateAllKeyCards();
-            }
-          };
-          tdActions.appendChild(delBtn);
-          tr.appendChild(tdActions);
-      
-          tbody.appendChild(tr);
-        });
-      }
-      
-      // ================================
-      // Keys management
-      // ================================
-      
-	async function addKey() {
-	  const title = prompt("Enter key name:");
-	  if (!title) return;
-	  const keyValue = prompt("Enter key value (secret):");
-	  if (!keyValue) return;
-	  const selectedMasterKey = await chooseMasterKey();
-	  if (!selectedMasterKey) return;
-	  try {
-		const encrypted = await encryptText(keyValue, selectedMasterKey.password);
-		const id = await sha256(title + keyValue);
-		const keyObj = {
-		  id: id,
-		  title: title,
-		  encryptedKey: encrypted,
-		  encryptionHash: selectedMasterKey.hash,
-		};
-		if (!keys.find((k) => k.id === id)) {
-		  keys.push(keyObj);
-		}
-		saveKeys();
-		renderKeys();
-		updateAllKeyCards();
-	  } catch (e) {
-		alert("Error encrypting key: " + e.message);
-	  }
-	}
-
-	async function chooseMasterKey() {
-	  if (masterKeys.length === 0) {
-		await addMasterKey();
-	  }
-	  if (masterKeys.length === 1) {
-		return masterKeys[0];
-	  } else {
-		const options = masterKeys
-		  .map(
-			(mk, idx) =>
-			  (idx + 1) +
-			  ": " +
-			  mk.hash.substring(0, 6) +
-			  "..." +
-			  " (" +
-			  mk.password.substring(0, 4) +
-			  "...)"
-		  )
-		  .join("\n");
-
-		const choice = prompt(
-		  "Choose a master key for encryption:\n0. Add new master key\n" + options
-		);
-		const index = parseInt(choice) - 1;
-		if (index >= 0 && index < masterKeys.length) {
-		  return masterKeys[index];
-		} else if (index === masterKeys.length) {
-		  await addMasterKey();
-		  return await chooseMasterKey();
-		} else {
-		  alert("Invalid choice");
-		  return null;
-		}
-	  }
-	}
-
-	async function addMasterKey() {
-	  const input = prompt("Enter master key:");
-	  if (!input) return;
-	  const hash = await sha256(input);
-	  if (masterKeys.some((mk) => mk.hash === hash)) {
-		alert("Master key already added");
-		return;
-	  }
-	  masterKeys.push({
-		password: input,
-		hash: hash,
-	  });
-	  await saveMasterKeys();
-	  updateMasterDisplay();
-	  renderKeys();
-	  updateAllKeyCards();
-	}
-
-      
-      // ================================
-      // Export and import
-      // ================================
-      
-      async function exportData(toFile = false) {
-        const combined = { keys, masterKeys };
-        const combinedString = JSON.stringify(combined);
-        const combinedBase64 = base64EncodeUnicode(combinedString);
-        const password = prompt("Enter password for exporting data:");
-        if (!password) return;
-        try {
-          const encrypted = await encryptText(combinedBase64, password);
-          const finalExport = base64EncodeUnicode(encrypted);
-          if (toFile) {
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[:.]/g, "-");
-            const filename = `${timestamp}.keystore`;
-            const blob = new Blob([finalExport], { type: "text/plain" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(url);
-            alert("Data exported to file: " + filename);
-          } else {
-            try {
-              await navigator.clipboard.writeText(finalExport);
-              alert("Data successfully exported and copied to clipboard!");
-            } catch {
-              showCopyModal(finalExport);
-            }
-          }
-        } catch (e) {
-          alert("Error exporting data: " + e.message);
-        }
-      }
-      
-      async function importData(fromFile = false) {
-        let input;
-        if (fromFile) {
-          const fileInput = document.createElement("input");
-          fileInput.type = "file";
-          fileInput.accept = ".keystore, text/plain";
-          fileInput.onchange = async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async () => {
-              await processImport(reader.result);
-            };
-            reader.readAsText(file);
-          };
-          fileInput.click();
+async function loadMasterKeys() {
+  const storedEncHash = localStorage.getItem("masterKeysEncKeyHash");
+  if (storedEncHash) {
+    let validKey = false;
+    while (!validKey) {
+      sessionEncKey = await prompt(
+        "Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)"
+      );
+      if (!sessionEncKey) {
+        if (confirm("No key entered. Do you want to reset master keys?")) {
+          localStorage.removeItem("masterKeys");
+          localStorage.removeItem("masterKeysEncKeyHash");
+          masterKeys = [];
+          sessionEncKey = null;
+          break;
         } else {
-          input = prompt("Paste the string to import data:");
-          if (input) await processImport(input.trim());
+          continue;
         }
       }
-      
-      async function processImport(input) {
-        const password = prompt("Enter password for importing data:");
-        if (!password) return;
+      if (sessionEncKey === "CLEAR MASTERKEYS") {
+        localStorage.removeItem("masterKeys");
+        localStorage.removeItem("masterKeysEncKeyHash");
+        masterKeys = [];
+        sessionEncKey = null;
+        break;
+      }
+      const hashOfSessionKey = await sha256(sessionEncKey);
+      if (hashOfSessionKey !== storedEncHash) {
+        continue;
+      } else {
+        validKey = true;
+        const encryptedMasterKeys = localStorage.getItem("masterKeys");
         try {
-          const encrypted = base64DecodeUnicode(input);
-          const decryptedBase64 = await decryptText(encrypted, password);
-          const combinedString = base64DecodeUnicode(decryptedBase64);
-          const combined = JSON.parse(combinedString);
-          mergeImportedKeys(combined.keys);
-          mergeImportedMasterKeys(combined.masterKeys);
-          saveKeys();
-          await saveMasterKeys();
-          updateMasterDisplay();
-          await updateDecryptionForKeys();
-          renderKeys();
-          updateAllKeyCards();
-          alert("Data imported successfully!");
+          const decryptedJSON = await decryptText(encryptedMasterKeys, sessionEncKey);
+          masterKeys = JSON.parse(decryptedJSON);
         } catch (e) {
-          alert("Error importing data: " + e.message);
+          alert("Error decrypting master keys: " + e.message);
+          masterKeys = [];
         }
       }
-      
-      function mergeImportedKeys(importedKeys) {
-        if (importedKeys) {
-          importedKeys.forEach((newKey) => {
-            const existingKey = keys.find((k) => k.id === newKey.id);
-            if (existingKey) {
-              if (existingKey.title !== newKey.title) {
-                existingKey.title = newKey.title;
-              }
-            } else {
-              keys.push(newKey);
-            }
-          });
+    }
+  } else {
+    const stored = localStorage.getItem("masterKeys");
+    masterKeys = stored ? JSON.parse(stored) : [];
+  }
+  updateURL();
+  updateEncButton();
+}
+
+async function saveMasterKeys() {
+  if (sessionEncKey) {
+    const jsonData = JSON.stringify(masterKeys);
+    try {
+      const encrypted = await encryptText(jsonData, sessionEncKey);
+      localStorage.setItem("masterKeys", encrypted);
+      const hashOfSessionKey = await sha256(sessionEncKey);
+      localStorage.setItem("masterKeysEncKeyHash", hashOfSessionKey);
+    } catch (e) {
+      alert("Error encrypting master keys: " + e.message);
+    }
+  } else {
+    localStorage.setItem("masterKeys", JSON.stringify(masterKeys));
+    localStorage.removeItem("masterKeysEncKeyHash");
+  }
+  updateURL();
+}
+
+async function changeMasterKeysEncryptionKey() {
+  const newKey = await prompt("Enter a new key for encrypting master keys:");
+  if (!newKey) return;
+  sessionEncKey = newKey;
+  await saveMasterKeys();
+  alert("Master keys encryption key successfully changed.");
+  updateEncButton();
+  updateMasterEncryptionControls();
+}
+
+async function enableMasterKeysEncryption() {
+  const newKey = await prompt("Enter the key to encrypt master keys:");
+  if (!newKey) return;
+  sessionEncKey = newKey;
+  await saveMasterKeys();
+  alert("Master keys are now encrypted.");
+  updateEncButton();
+  updateMasterEncryptionControls();
+}
+
+async function disableMasterKeysEncryption() {
+  if (
+    !confirm(
+      "Are you sure you want to disable encryption of master keys? They will be stored in plaintext."
+    )
+  ) {
+    return;
+  }
+  const decryptedKeys = masterKeys;
+  sessionEncKey = null;
+  masterKeys = decryptedKeys;
+  await saveMasterKeys();
+  alert("Encryption of master keys disabled.");
+  updateEncButton();
+  updateMasterEncryptionControls();
+}
+
+// ================================
+// UI Functions
+// ================================
+
+function updateEncButton() {
+  const controlsDiv = document.getElementById("encControls");
+  controlsDiv.innerHTML = "";
+  const button = document.createElement("button");
+  if (sessionEncKey) {
+    button.textContent = "Master keys encrypted";
+    button.style.backgroundColor = "#22863a";
+  } else {
+    button.textContent = "Master keys unencrypted!";
+    button.style.backgroundColor = "#d73a49";
+  }
+  button.addEventListener("click", openManageMasterModal);
+  controlsDiv.appendChild(button);
+}
+
+function updateMasterEncryptionControls() {
+  const container = document.getElementById("masterEncryptionControls");
+  container.innerHTML = "";
+  if (sessionEncKey) {
+    const changeBtn = document.createElement("button");
+    changeBtn.textContent = "Change encryption key";
+    changeBtn.addEventListener("click", changeMasterKeysEncryptionKey);
+    container.appendChild(changeBtn);
+    const disableBtn = document.createElement("button");
+    disableBtn.textContent = "Disable encryption";
+    disableBtn.addEventListener("click", disableMasterKeysEncryption);
+    container.appendChild(disableBtn);
+  } else {
+    const enableBtn = document.createElement("button");
+    enableBtn.textContent = "Enable master keys encryption";
+    enableBtn.addEventListener("click", enableMasterKeysEncryption);
+    container.appendChild(enableBtn);
+  }
+}
+
+function deleteKey(keyObj) {
+  if (confirm("Are you sure you want to delete this key?")) {
+    keys = keys.filter((k) => k.id !== keyObj.id);
+    saveKeys();
+
+    const cardToDelete = document.getElementById("key-" + keyObj.id);
+    if (cardToDelete) {
+      cardToDelete.remove();
+    }
+
+    if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+      rendersecretKeysTable();
+    }
+  }
+}
+
+function createKeyCard(keyObj) {
+  const card = document.createElement("div");
+  card.className = "key-card";
+  card.id = "key-" + keyObj.id;
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "delete-btn";
+  delBtn.innerHTML = "&times;";
+  delBtn.title = "Delete this key";
+  delBtn.onclick = () => deleteKey(keyObj);
+  card.appendChild(delBtn);
+
+  const publicDiv = document.createElement("div");
+  publicDiv.className = "public-values";
+
+  const titleDiv = document.createElement("div");
+  titleDiv.className = "title";
+  titleDiv.innerHTML =
+    '<strong>Name:</strong> <span class="editable-title" data-key-id="' +
+    keyObj.id +
+    '" contenteditable="true" spellcheck="false">' +
+    keyObj.title +
+    "</span>";
+  publicDiv.appendChild(titleDiv);
+
+  const otpDiv = document.createElement("div");
+  otpDiv.className = "otp";
+  otpDiv.innerHTML =
+    '<strong>OTP:</strong> <span id="otp-' + keyObj.id + '">N/A</span>';
+  publicDiv.appendChild(otpDiv);
+
+  const statusWrapper = document.createElement("div");
+  statusWrapper.className = "status-wrapper";
+
+  const statusContainer = document.createElement("div");
+  statusContainer.className = "status-container";
+
+  const statusLabel = document.createElement("strong");
+  statusLabel.textContent = "Status:";
+
+  const statusSpan = document.createElement("span");
+  statusSpan.id = "status-" + keyObj.id;
+  statusSpan.className = "status";
+  statusSpan.textContent = "Unknown";
+  statusSpan.setAttribute("data-key-id", keyObj.id);
+  statusSpan.addEventListener("click", async function () {
+    const id = this.getAttribute("data-key-id");
+    const key = keys.find((k) => k.id === id);
+    if (!key) return;
+    const mk = getMatchingMasterKey(key);
+    if (mk) {
+      try {
+        const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
+        await navigator.clipboard.writeText(decryptedSecret);
+        alert("Secret copied to clipboard!");
+        decryptedSecret = null;
+      } catch (e) {
+        alert("Copy failed: " + e.message);
+      }
+    }
+  });
+
+  statusContainer.appendChild(statusLabel);
+  statusContainer.appendChild(statusSpan);
+  statusWrapper.appendChild(statusContainer);
+
+  const progressContainer = document.createElement("div");
+  progressContainer.className = "otp-progress-container";
+  progressContainer.innerHTML = `
+    <div class="progress-container">
+      <div class="progress-circle"></div>
+      <div class="progress-fill" id="progress-${keyObj.id}"></div>
+    </div>
+  `;
+  statusWrapper.appendChild(progressContainer);
+
+  publicDiv.appendChild(statusWrapper);
+  card.appendChild(publicDiv);
+
+  return card;
+}
+
+function renderKeys() {
+  const container = document.getElementById("keysContainer");
+  container.innerHTML = "";
+  keys.forEach((keyObj) => {
+    container.appendChild(createKeyCard(keyObj));
+  });
+  attachEditableTitleListeners();
+}
+
+function attachEditableTitleListeners() {
+  const editableTitles = document.querySelectorAll(".editable-title");
+
+  editableTitles.forEach((span) => {
+    span.addEventListener("blur", function () {
+      const keyId = this.getAttribute("data-key-id");
+      const keyObj = keys.find((k) => k.id === keyId);
+      if (keyObj) {
+        const newTitle = this.textContent.trim();
+        if (newTitle && newTitle !== keyObj.title) {
+          keyObj.title = newTitle;
+          saveKeys();
+
+          this.textContent = newTitle;
+          if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+            rendersecretKeysTable();
+          }
         }
       }
-      
-      function mergeImportedMasterKeys(importedMasterKeys) {
-        if (importedMasterKeys) {
-          importedMasterKeys.forEach((newMk) => {
-            if (!masterKeys.find((mk) => mk.hash === newMk.hash)) {
-              masterKeys.push(newMk);
-            }
-          });
-        }
+    });
+
+    span.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.blur();
       }
-      // ================================
-      // Init and Event Listeners
-      // ================================
-	function initEventListeners() {
-	  document.getElementById("copyButton").addEventListener("click", async function () {
-		const textarea = document.getElementById("copyTextArea");
-		try {
-		  await navigator.clipboard.writeText(textarea.value);
-		  alert("Copied to clipboard!");
-		} catch (e) {
-		  alert("Copy failed: " + e.message);
-		}
-		document.getElementById("copyModal").style.display = "none";
-	  });
+    });
+  });
+}
 
-	  document.getElementById("addKeyBtn").addEventListener("click", addKey);
-	  document.querySelectorAll(".addMasterKeyBtn").forEach(function (button) {
-		button.addEventListener("click", addMasterKey);
-	  });
-	  document.getElementById("manageMasterKeysBtn").addEventListener("click", openManageMasterModal);
-	  document.getElementById("exportTextBtn").addEventListener("click", () => exportData(false));
-	  document.getElementById("exportFileBtn").addEventListener("click", () => exportData(true));
-	  document.getElementById("importTextBtn").addEventListener("click", () => importData(false));
-	  document.getElementById("importFileBtn").addEventListener("click", () => importData(true));
+async function openManageMasterModal() {
+  renderMasterKeysTable();
+  updateMasterEncryptionControls();
+  document.getElementById("manageMasterModal").style.display = "flex";
+}
 
-	  document.getElementById("clearStorageBtn").addEventListener("click", function () {
-		if (
-		  !confirm(
-			"Are you sure you want to permanently clear all data? This action cannot be undone."
-		  )
-		) {
-		  return;
-		}
-		localStorage.removeItem("authKeys");
-		localStorage.removeItem("masterKeys");
-		localStorage.removeItem("masterKeysEncKeyHash");
-		history.replaceState(null, "", window.location.pathname);
-		sessionEncKey = null;
-		loadKeys();
-		loadMasterKeys();
-		updateMasterDisplay();
-		renderKeys();
-		updateEncControls();
-	  });
+function closeManageMasterModal() {
+  document.getElementById("manageMasterModal").style.display = "none";
+}
 
-	  document.getElementById("closeManageMasterModal").addEventListener("click", closeManageMasterModal);
-	  window.addEventListener("click", function (event) {
-		const modal = document.getElementById("manageMasterModal");
-		if (event.target === modal) {
-		  closeManageMasterModal();
-		}
-	  });
+function renderMasterKeysTable() {
+  const tbody = document.querySelector("#masterKeysTable tbody");
+  tbody.innerHTML = "";
 
-	  document.getElementById("toggleRevealMasterKeysBtn").addEventListener("click", function () {
-		masterKeysRevealed = !masterKeysRevealed;
-		this.textContent = masterKeysRevealed ? "Hide master keys" : "Reveal master keys";
-		renderMasterKeysTable();
-	  });
-	}
+  masterKeys.forEach((mk) => {
+    const usageCount = keys.filter(
+      (keyObj) => keyObj.encryptionHash === mk.hash
+    ).length;
+    const tr = document.createElement("tr");
 
-	async function init() {
-	  loadKeys();
-	  await loadMasterKeys();
-	  renderKeys();
-	  updateMasterDisplay();
-	  startOTPUpdater();
-	  updateProgressCircles();
-	  initEventListeners();
-	}
+    const tdMasterKey = document.createElement("td");
+    tdMasterKey.className = "master-key-cell";
+    tdMasterKey.textContent = masterKeysRevealed ? mk.password : "Click to copy key";
+    tdMasterKey.addEventListener("click", async function () {
+      try {
+        await navigator.clipboard.writeText(mk.password);
+        alert("Master key copied to clipboard!");
+      } catch (e) {
+        alert("Copy failed: " + e.message);
+      }
+    });
+    tr.appendChild(tdMasterKey);
 
-	document.addEventListener("DOMContentLoaded", init);
+    const hashToDisplay =
+      window.innerWidth < 768 ? mk.hash.slice(0, 15) + "..." : mk.hash;
+    const tdHash = document.createElement("td");
+    tdHash.textContent = hashToDisplay;
+    tr.appendChild(tdHash);
+
+    const tdUsage = document.createElement("td");
+    tdUsage.textContent = usageCount;
+    tr.appendChild(tdUsage);
+
+    const tdActions = document.createElement("td");
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.onclick = function () {
+      if (confirm("Delete this master key?")) {
+        masterKeys = masterKeys.filter((key) => key.hash !== mk.hash);
+        saveMasterKeys();
+
+        tr.remove();
+
+        updateAffectedKeys(mk.hash);
+      }
+    };
+    tdActions.appendChild(delBtn);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function updateAffectedKeys(deletedHash) {
+  keys.forEach((keyObj) => {
+    if (keyObj.encryptionHash === deletedHash) {
+      keyObj.decryptedSecret = null;
+      if (statusElement) {
+        statusElement.textContent = "Encrypted"; 
+      }
+    }
+  });
+}
+
+async function openManagesecretKeysModal() {
+  await updateDecryptionForKeys();
+  rendersecretKeysTable();
+  document.getElementById("managesecretKeysModal").style.display = "flex";
+}
+
+function closeManagesecretKeysModal() {
+  document.getElementById("managesecretKeysModal").style.display = "none";
+}
+
+function rendersecretKeysTable() {
+  const tbody = document.querySelector("#secretKeysTable tbody");
+  tbody.innerHTML = "";
+  keys.forEach((keyObj, idx) => {
+    const tr = document.createElement("tr");
+
+    const tdKey = document.createElement("td");
+    tdKey.className = "master-key-cell";
+    if (secretKeysRevealed) {
+      tdKey.textContent = keyObj.decryptedSecret || "Encrypted";
+    } else {
+      tdKey.textContent = "Click to copy key";
+    }
+    tdKey.addEventListener("click", async function () {
+      const mk = getMatchingMasterKey(keyObj);
+      if (!keyObj.decryptedSecret && mk) {
+        try {
+          keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
+          await navigator.clipboard.writeText(keyObj.decryptedSecret);
+          alert("Key copied to clipboard!");
+          rendersecretKeysTable();
+        } catch (e) {
+          alert("Decryption or copy failed: " + e.message);
+        }
+      } else if (keyObj.decryptedSecret) {
+        try {
+          await navigator.clipboard.writeText(keyObj.decryptedSecret);
+          alert("Key copied to clipboard!");
+        } catch (e) {
+          alert("Copy failed: " + e.message);
+        }
+      } else {
+        alert("Master key not available to decrypt this key.");
+      }
+    });
+    tr.appendChild(tdKey);
+
+    const tdHash = document.createElement("td");
+    tdHash.textContent = keyObj.encryptionHash;
+    tr.appendChild(tdHash);
+
+    const tdActions = document.createElement("td");
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.onclick = function () {
+      deleteKey(keyObj, idx);
+    };
+    tdActions.appendChild(delBtn);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+  updatesecretKeysRevealButton();
+}
+
+function updatesecretKeysRevealButton() {
+  let btn = document.getElementById("toggleRevealsecretKeysBtn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "toggleRevealsecretKeysBtn";
+    document.querySelector("#managesecretKeysModalContent").appendChild(btn);
+  }
+  btn.onclick = function() {
+    secretKeysRevealed = !secretKeysRevealed;
+    this.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
+    rendersecretKeysTable();
+  };
+  btn.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
+}
+
+// ================================
+// OTP Functions
+// ================================
+
+function getMatchingMasterKey(keyObj) {
+  return masterKeys.find((mk) => mk.hash === keyObj.encryptionHash);
+}
+
+async function updateKeyCard(keyObj) {
+  const otpSpan = document.getElementById("otp-" + keyObj.id);
+  const statusSpan = document.getElementById("status-" + keyObj.id);
+  const mk = getMatchingMasterKey(keyObj);
+  if (mk) {
+    try {
+      const decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
+      const otp = await generateOTP(decryptedSecret);
+      otpSpan.textContent = otp;
+      statusSpan.textContent = "Decrypted";
+      statusSpan.className = "status status-decrypted";
+    } catch (e) {
+      otpSpan.textContent = "N/A";
+      statusSpan.textContent = "Decryption error";
+      statusSpan.className = "status status-failed";
+    }
+  } else {
+    otpSpan.textContent = "N/A";
+    statusSpan.textContent = "Encrypted";
+    statusSpan.className = "status status-encrypted";
+  }
+}
+
+async function updateAllKeyCards() {
+  keys.forEach((keyObj) => updateKeyCard(keyObj));
+}
+
+async function updateDecryptionForKeys() {
+  if (masterKeys.length === 0) {
+    keys.forEach((keyObj) => (keyObj.status = "encrypted"));
+    return;
+  }
+  for (const keyObj of keys) {
+    const mk = getMatchingMasterKey(keyObj);
+    if (mk) {
+      if (keyObj.decryptedSecret) {
+        keyObj.status = "decrypted";
+      } else {
+        keyObj.status = await decryptKey(keyObj, mk);
+      }
+    } else {
+      keyObj.status = "encrypted";
+    }
+  }
+}
+
+async function decryptKey(keyObj, mk) {
+  try {
+    keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
+    return "decrypted";
+  } catch {
+    return "failed";
+  }
+}
+
+// ================================
+// Export and Import
+// ================================
+async function exportData(toFile = false) {
+  const combined = { keys, masterKeys };
+  const combinedString = JSON.stringify(combined);
+  const combinedBase64 = base64EncodeUnicode(combinedString);
+  const password = await prompt("Enter password for exporting data:");
+  if (!password) return;
+  try {
+    const encrypted = await encryptText(combinedBase64, password);
+    const finalExport = base64EncodeUnicode(encrypted);
+    if (toFile) {
+      const now = new Date();
+      const timestamp = now.toISOString().replace(/[:.]/g, "-");
+      const filename = `${timestamp}.keystore`;
+      const blob = new Blob([finalExport], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      alert("Data exported to file: " + filename);
+    } else {
+      try {
+        await navigator.clipboard.writeText(finalExport);
+        alert("Data successfully exported and copied to clipboard!");
+      } catch {
+        showCopyModal(finalExport);
+      }
+    }
+  } catch (e) {
+    alert("Error exporting data: " + e.message);
+  }
+}
+
+async function importData(fromFile = false) {
+  let input;
+  if (fromFile) {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".keystore, text/plain";
+    fileInput.onchange = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        await processImport(reader.result);
+      };
+      reader.readAsText(file);
+    };
+    fileInput.click();
+  } else {
+    input = await prompt("Paste the string to import data:");
+    if (input) await processImport(input.trim());
+  }
+}
+
+async function processImport(input) {
+  const password = await prompt("Enter password for importing data:");
+  if (!password) return;
+  try {
+    const encrypted = base64DecodeUnicode(input);
+    const decryptedBase64 = await decryptText(encrypted, password);
+    const combinedString = base64DecodeUnicode(decryptedBase64);
+    const combined = JSON.parse(combinedString);
+    mergeImportedKeys(combined.keys);
+    mergeImportedMasterKeys(combined.masterKeys);
+    saveKeys();
+    await saveMasterKeys();
+    await updateDecryptionForKeys();
+    renderKeys();
+    updateAllKeyCards();
+    alert("Data imported successfully!");
+  } catch (e) {
+    alert("Error importing data: " + e.message);
+  }
+}
+
+function mergeImportedKeys(importedKeys) {
+  if (importedKeys) {
+    importedKeys.forEach((newKey) => {
+      const existingKey = keys.find((k) => k.id === newKey.id);
+      if (existingKey) {
+        if (existingKey.title !== newKey.title) {
+          existingKey.title = newKey.title;
+        }
+      } else {
+        keys.push(newKey);
+      }
+    });
+  }
+}
+
+function mergeImportedMasterKeys(importedMasterKeys) {
+  if (importedMasterKeys) {
+    importedMasterKeys.forEach((newMk) => {
+      if (!masterKeys.find((mk) => mk.hash === newMk.hash)) {
+        masterKeys.push(newMk);
+      }
+    });
+  }
+}
+
+// ================================
+// Init and Event Listeners
+// ================================
+function initEventListeners() {
+  document.getElementById("copyButton").addEventListener("click", async function () {
+    const textarea = document.getElementById("copyTextArea");
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      alert("Copied to clipboard!");
+    } catch (e) {
+      alert("Copy failed: " + e.message);
+    }
+    document.getElementById("copyModal").style.display = "none";
+  });
+
+  document.getElementById("addKeyBtn").addEventListener("click", addKey);
+  document.querySelectorAll(".addMasterKeyBtn").forEach(function (button) {
+    button.addEventListener("click", addMasterKey);
+  });
+  document.getElementById("manageMasterKeysBtn").addEventListener("click", openManageMasterModal);
+  document.getElementById("managesecretKeysBtn").addEventListener("click", openManagesecretKeysModal);
+  document.getElementById("exportTextBtn").addEventListener("click", () => exportData(false));
+  document.getElementById("exportFileBtn").addEventListener("click", () => exportData(true));
+  document.getElementById("importTextBtn").addEventListener("click", () => importData(false));
+  document.getElementById("importFileBtn").addEventListener("click", () => importData(true));
+
+  document.getElementById("clearStorageBtn").addEventListener("click", function () {
+    if (
+      !confirm(
+        "Are you sure you want to permanently clear all data? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+    localStorage.removeItem("authKeys");
+    localStorage.removeItem("masterKeys");
+    localStorage.removeItem("masterKeysEncKeyHash");
+    history.replaceState(null, "", window.location.pathname);
+    sessionEncKey = null;
+    loadKeys();
+    loadMasterKeys();
+    renderKeys();
+    updateEncButton();
+  });
+
+  document.getElementById("closeManageMasterModal").addEventListener("click", closeManageMasterModal);
+  document.getElementById("closeManagesecretKeysModal").addEventListener("click", closeManagesecretKeysModal);
+  window.addEventListener("click", function (event) {
+    const masterModal = document.getElementById("manageMasterModal");
+    const secretModal = document.getElementById("managesecretKeysModal");
+    if (event.target === masterModal) {
+      closeManageMasterModal();
+    }
+    if (event.target === secretModal) {
+      closeManagesecretKeysModal();
+    }
+  });
+
+  document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", function () {
+    masterKeysRevealed = !masterKeysRevealed;
+    this.textContent = masterKeysRevealed ? "Hide master keys" : "Reveal master keys";
+    renderMasterKeysTable();
+  });
+}
+
+async function addKey() {
+  const title = await prompt("Enter key name:");
+  if (!title) return;
+  const keyValue = await prompt("Enter key value (secret):");
+  if (!keyValue) return;
+  const selectedMasterKey = await chooseMasterKey();
+  if (!selectedMasterKey) return;
+  try {
+    const encrypted = await encryptText(keyValue, selectedMasterKey.password);
+    const id = await sha256(title + keyValue);
+    const keyObj = {
+      id: id,
+      title: title,
+      encryptedKey: encrypted,
+      encryptionHash: selectedMasterKey.hash,
+    };
+    if (!keys.find((k) => k.id === id)) {
+      keys.push(keyObj);
+    }
+    saveKeys();
+    renderKeys();
+    updateAllKeyCards();
+    if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+      rendersecretKeysTable();
+    }
+  } catch (e) {
+    alert("Error encrypting key: " + e.message);
+  }
+}
+
+async function chooseMasterKey() {
+  if (masterKeys.length === 0) {
+    await addMasterKey();
+  }
+  if (masterKeys.length === 1) {
+    return masterKeys[0];
+  } else {
+    const options = masterKeys
+      .map(
+        (mk, idx) =>
+          (idx + 1) +
+          ": " +
+          mk.hash.substring(0, 6) +
+          "..." +
+          " (" +
+          mk.password.substring(0, 4) +
+          "...)"
+      )
+      .join("\n");
+    const choice = await prompt(
+      "Choose a master key for encryption:\n0. Add new master key\n" + options
+    );
+    const index = parseInt(choice) - 1;
+    if (index >= 0 && index < masterKeys.length) {
+      return masterKeys[index];
+    } else if (index === masterKeys.length) {
+      await addMasterKey();
+      return await chooseMasterKey();
+    } else {
+      alert("Invalid choice");
+      return null;
+    }
+  }
+}
+
+async function addMasterKey() {
+  const input = await prompt("Enter master key:");
+  if (!input) return;
+  const hash = await sha256(input);
+  if (masterKeys.some((mk) => mk.hash === hash)) {
+    alert("Master key already added");
+    return;
+  }
+  masterKeys.push({
+    password: input,
+    hash: hash,
+  });
+  await saveMasterKeys();
+  await updateDecryptionForKeys();
+  renderKeys();
+  await updateAllKeyCards();
+  updateEncButton();
+  if (document.getElementById("manageMasterModal").style.display !== "none") {
+    renderMasterKeysTable();
+  }
+}
+
+
+function startOTPUpdater() {
+  const now = Date.now();
+  const nextUpdate = 30000 - (now % 30000);
+  updateAllKeyCards();
+  setTimeout(() => {
+    updateAllKeyCards();
+    setInterval(updateAllKeyCards, 30000);
+  }, nextUpdate);
+}
+
+function updateProgressCircles() {
+  const now = Date.now();
+  const elapsed = now % 30000;
+  const remaining = 30000 - elapsed;
+  const angle = (remaining / 30000) * 360;
+  document.querySelectorAll(".progress-fill").forEach(function (elem) {
+    elem.style.background = `conic-gradient(#58a6ff ${angle}deg, #161b22 ${angle}deg)`;
+  });
+  requestAnimationFrame(updateProgressCircles);
+}
+
+async function init() {
+  loadKeys();
+  await loadMasterKeys();
+  renderKeys();
+  startOTPUpdater();
+  updateProgressCircles();
+  initEventListeners();
+}
+document.addEventListener("DOMContentLoaded", init);
 
     </script>
   </body>
