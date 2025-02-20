@@ -356,7 +356,6 @@ function createKeyCard(keyObj) {
         const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
         await navigator.clipboard.writeText(decryptedSecret);
         alert("Secret copied to clipboard!");
-        decryptedSecret = null;
       } catch (e) {
         alert("Copy failed: " + e.message);
       }
