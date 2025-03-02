@@ -15,24 +15,16 @@
     </header>
     <main>
 <div id="keysContainer"></div>
-<div id="buttonContainer">
-  <button id="addKeyBtn">Add key</button>
-  <button class="addMasterKeyBtn">Add master key</button>
-  <button id="managesecretKeysBtn">My secret keys</button>
-  <button id="manageMasterKeysBtn">My master keys</button>
+<div class="buttonContainer">
+  <button id="addKeyBtn" onclick="addKey()">Add key</button>
+  <button class="addMasterKeyBtn" onclick="addMasterKey()">Add master key</button>
+  <button id="managesecretKeysBtn" onclick="openManagesecretKeysModal()">My secret keys</button>
+  <button id="manageMasterKeysBtn" onclick="openManageMasterModal()">My master keys</button>
+  <br/>
+  <button id="clearStorageBtn" onclick="clearStorage()">Clear All Data</button>
+  <button id="settingsBtn" onclick="openSettingsModal()">Settings</button>
 </div>
-      <br/>
-      <div>
-        <div class="split-button" id="exportSplitBtn">
-          <div class="left" id="exportTextBtn">Export String</div>
-          <div class="right" id="exportFileBtn">Export File</div>
-        </div>
-        <div class="split-button" id="importSplitBtn">
-          <div class="left" id="importTextBtn">Import String</div>
-          <div class="right" id="importFileBtn">Import File</div>
-        </div>
-        <button id="clearStorageBtn">Clear All Data</button>
-      </div>
+
     </main>
     <div id="notification" class="notification">
       <p></p>
@@ -45,7 +37,7 @@
     </div>
     <div id="manageMasterModal" class="modal">
       <div id="manageMasterModalContent" class="modal-content">
-        <span id="closeManageMasterModal" class="close">&times;</span>
+        <span id="closeManageMasterModal" class="close" onclick="closeManageMasterModal()">&times;</span>
         <h2 style="text-align: center;">Master Keys</h2>
         <table id="masterKeysTable">
           <thead>
@@ -67,7 +59,7 @@
     </div>
     <div id="managesecretKeysModal" class="modal">
       <div id="managesecretKeysModalContent" class="modal-content">
-        <span id="closeManagesecretKeysModal" class="close">&times;</span>
+        <span id="closeManagesecretKeysModal" class="close" onclick="closeManagesecretKeysModal()">&times;</span>
         <h2 style="text-align: center;">Secret Keys</h2>
         <table id="secretKeysTable">
           <thead>
@@ -94,9 +86,63 @@
         </div>
       </form>
     </dialog>
+<div id="settingsModal" class="modal">
+  <div id="settingsModalContent" class="modal-content">
+    <span id="closeSettingsModal" class="close" onclick="closeSettingsModal()">&times;</span>
+    <h2 style="text-align: center;">Settings</h2>
+
+    <div class="setting-item" style="display: flex; align-items: center; justify-content: space-between;">
+      <label for="passwordHideOnSwitch" style="display: inline-block;">Hide Password Input</label>
+      <label class="switch">
+        <input type="checkbox" id="passwordHideOnSwitch" />
+        <span class="slider round"></span>
+      </label>
+    </div>
+
+    <div id="additionalSettings" style="text-align: center; margin-top: 20px;">
+      <div class="buttonContainer">
+        <button id="exportTextBtn" onclick="exportData(false)">Export String</button>
+        <button id="exportFileBtn" onclick="exportData(true)">Export File</button>
+        <button id="importTextBtn" onclick="importData(false)">Import String</button>
+        <button id="importFileBtn" onclick="importData(true)">Import File</button>
+      </div>
+    </div>
+  </div>
+</div>
+
     <script src="crypto.js"></script>
     <script src ="essentials.js"></script>
 	<script>
+
+let PasswordHideOn;
+
+function openSettingsModal() {
+  document.getElementById("settingsModal").style.display = "flex";
+  document.getElementById("passwordHideOnSwitch").checked = (PasswordHideOn === 1);
+}
+
+function closeSettingsModal() {
+  document.getElementById("settingsModal").style.display = "none";
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  PasswordHideOn = localStorage.getItem('passwordHideOn');
+  
+  if (PasswordHideOn === null) {
+    PasswordHideOn = /mobile/i.test(navigator.userAgent) ? 0 : 1;
+  } else {
+    PasswordHideOn = parseInt(PasswordHideOn, 10);
+  }
+
+  const checkbox = document.getElementById("passwordHideOnSwitch");
+  checkbox.checked = PasswordHideOn === 1;
+
+  checkbox.addEventListener('change', function() {
+    PasswordHideOn = this.checked ? 1 : 0;
+    localStorage.setItem('passwordHideOn', PasswordHideOn);
+  });
+});
+
 // ================================
 // localStorage management
 // ================================
@@ -148,7 +194,8 @@ async function loadMasterKeys() {
     let validKey = false;
     while (!validKey) {
       sessionEncKey = await prompt(
-        "Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)"
+        "Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)",
+		1
       );
       if (!sessionEncKey) {
         if (confirm("No key entered. Do you want to reset master keys?")) {
@@ -210,7 +257,7 @@ async function saveMasterKeys() {
 }
 
 async function changeMasterKeysEncryptionKey() {
-  const newKey = await prompt("Enter a new key for encrypting master keys:");
+  const newKey = await prompt("Enter a new key for encrypting master keys:", 1);
   if (!newKey) return;
   sessionEncKey = newKey;
   await saveMasterKeys();
@@ -220,7 +267,7 @@ async function changeMasterKeysEncryptionKey() {
 }
 
 async function enableMasterKeysEncryption() {
-  const newKey = await prompt("Enter the key to encrypt master keys:");
+  const newKey = await prompt("Enter the key to encrypt master keys:", 1);
   if (!newKey) return;
   sessionEncKey = newKey;
   await saveMasterKeys();
@@ -421,14 +468,37 @@ function attachEditableTitleListeners() {
   });
 }
 
+function openModal(modalId, updateFunction) {
+  if (updateFunction) {
+    updateFunction();
+  }
+  document.getElementById(modalId).style.display = "flex";
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).style.display = "none";
+}
+
 async function openManageMasterModal() {
-  renderMasterKeysTable();
-  updateMasterEncryptionControls();
-  document.getElementById("manageMasterModal").style.display = "flex";
+  openModal("manageMasterModal", () => {
+    renderMasterKeysTable();
+    updateMasterEncryptionControls();
+  });
 }
 
 function closeManageMasterModal() {
-  document.getElementById("manageMasterModal").style.display = "none";
+  closeModal("manageMasterModal");
+}
+
+async function openManagesecretKeysModal() {
+  openModal("managesecretKeysModal", async () => {
+    await updateDecryptionForKeys();
+    rendersecretKeysTable();
+  });
+}
+
+function closeManagesecretKeysModal() {
+  closeModal("managesecretKeysModal");
 }
 
 function renderMasterKeysTable() {
@@ -495,15 +565,6 @@ function updateAffectedKeys(deletedHash) {
   });
 }
 
-async function openManagesecretKeysModal() {
-  await updateDecryptionForKeys();
-  rendersecretKeysTable();
-  document.getElementById("managesecretKeysModal").style.display = "flex";
-}
-
-function closeManagesecretKeysModal() {
-  document.getElementById("managesecretKeysModal").style.display = "none";
-}
 
 function rendersecretKeysTable() {
   const tbody = document.querySelector("#secretKeysTable tbody");
@@ -647,7 +708,7 @@ async function exportData(toFile = false) {
   const combined = { keys, masterKeys };
   const combinedString = JSON.stringify(combined);
   const combinedBase64 = base64EncodeUnicode(combinedString);
-  const password = await prompt("Enter password for exporting data:");
+  const password = await prompt("Enter password for exporting data:", 1);
   if (!password) return;
   try {
     const encrypted = await encryptText(combinedBase64, password);
@@ -700,7 +761,7 @@ async function importData(fromFile = false) {
 }
 
 async function processImport(input) {
-  const password = await prompt("Enter password for importing data:");
+  const password = await prompt("Enter password for importing data:", 1);
   if (!password) return;
   try {
     const encrypted = base64DecodeUnicode(input);
@@ -748,6 +809,7 @@ function mergeImportedMasterKeys(importedMasterKeys) {
 // ================================
 // Init and Event Listeners
 // ================================
+
 function initEventListeners() {
   document.getElementById("copyButton").addEventListener("click", async function () {
     const textarea = document.getElementById("copyTextArea");
@@ -759,17 +821,6 @@ function initEventListeners() {
     }
     document.getElementById("copyModal").style.display = "none";
   });
-
-  document.getElementById("addKeyBtn").addEventListener("click", addKey);
-  document.querySelectorAll(".addMasterKeyBtn").forEach(function (button) {
-    button.addEventListener("click", addMasterKey);
-  });
-  document.getElementById("manageMasterKeysBtn").addEventListener("click", openManageMasterModal);
-  document.getElementById("managesecretKeysBtn").addEventListener("click", openManagesecretKeysModal);
-  document.getElementById("exportTextBtn").addEventListener("click", () => exportData(false));
-  document.getElementById("exportFileBtn").addEventListener("click", () => exportData(true));
-  document.getElementById("importTextBtn").addEventListener("click", () => importData(false));
-  document.getElementById("importFileBtn").addEventListener("click", () => importData(true));
 
   document.getElementById("clearStorageBtn").addEventListener("click", function () {
     if (
@@ -790,19 +841,20 @@ function initEventListeners() {
     updateEncButton();
   });
 
-  document.getElementById("closeManageMasterModal").addEventListener("click", closeManageMasterModal);
-  document.getElementById("closeManagesecretKeysModal").addEventListener("click", closeManagesecretKeysModal);
-  window.addEventListener("click", function (event) {
-    const masterModal = document.getElementById("manageMasterModal");
-    const secretModal = document.getElementById("managesecretKeysModal");
-    if (event.target === masterModal) {
-      closeManageMasterModal();
-    }
-    if (event.target === secretModal) {
-      closeManagesecretKeysModal();
-    }
-  });
+	window.addEventListener("click", function (event) {
+	  const modals = [
+		{ element: document.getElementById("manageMasterModal"), closeFunction: closeManageMasterModal },
+		{ element: document.getElementById("managesecretKeysModal"), closeFunction: closeManagesecretKeysModal },
+		{ element: document.getElementById("settingsModal"), closeFunction: closeSettingsModal }
+	  ];
 
+	  modals.forEach(modal => {
+		if (event.target === modal.element) {
+		  modal.closeFunction();
+		}
+	  });
+	});
+	
   document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", function () {
     masterKeysRevealed = !masterKeysRevealed;
     this.textContent = masterKeysRevealed ? "Hide master keys" : "Reveal master keys";
@@ -813,7 +865,7 @@ function initEventListeners() {
 async function addKey() {
   const title = await prompt("Enter key name:");
   if (!title) return;
-  const keyValue = await prompt("Enter key value (secret):");
+  const keyValue = await prompt("Enter key value (secret):", 1);
   if (!keyValue) return;
   const selectedMasterKey = await chooseMasterKey();
   if (!selectedMasterKey) return;
@@ -876,7 +928,7 @@ async function chooseMasterKey() {
 }
 
 async function addMasterKey() {
-  const input = await prompt("Enter master key:");
+  const input = await prompt("Enter master key:", 1);
   if (!input) return;
   const hash = await sha256(input);
   if (masterKeys.some((mk) => mk.hash === hash)) {

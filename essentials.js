@@ -61,7 +61,8 @@ window.alert = function (message) {
 // ================================
 // Custom Prompt
 // ================================
-function customPrompt(text) {
+
+function customPrompt(text, isPassword = 0) {
   return new Promise((resolve) => {
     const promptDialog = document.getElementById("customPromptDialog");
     const promptText = document.getElementById("customPromptText");
@@ -71,12 +72,19 @@ function customPrompt(text) {
     
     promptText.innerText = text;
     promptInput.value = "";
+    if (PasswordHideOn === 0) {
+      promptInput.type = "text";
+    } else {
+      promptInput.type = isPassword ? "password" : "text";
+    }
+    
     okBtn.disabled = true;
     promptDialog.showModal();
 
     function cleanup() {
       okBtn.removeEventListener("click", onOk);
       cancelBtn.removeEventListener("click", onCancel);
+	  promptInput.type = "text";
       promptDialog.close();
     }
 
@@ -99,9 +107,10 @@ function customPrompt(text) {
     cancelBtn.addEventListener("click", onCancel);
   });
 }
+
 window.prompt = customPrompt;
 
 document.getElementById('customPromptInput').addEventListener('input', function() {
-  const okButton = document.getElementById('customPromptOk');
-  okButton.disabled = !this.value.trim();
+  document.getElementById('customPromptOk').disabled = !this.value.trim();
 });
+
