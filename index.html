@@ -37,7 +37,7 @@
     </div>
     <div id="manageMasterModal" class="modal">
       <div id="manageMasterModalContent" class="modal-content">
-        <span id="closeManageMasterModal" class="close" onclick="closeManageMasterModal()">&times;</span>
+        <span id="closeManageMasterModal" class="close" onclick="closeModal('manageMasterModal');">&times;</span>
         <h2 style="text-align: center;">Master Keys</h2>
         <table id="masterKeysTable">
           <thead>
@@ -59,7 +59,7 @@
     </div>
     <div id="managesecretKeysModal" class="modal">
       <div id="managesecretKeysModalContent" class="modal-content">
-        <span id="closeManagesecretKeysModal" class="close" onclick="closeManagesecretKeysModal()">&times;</span>
+        <span id="closeManagesecretKeysModal" class="close" onclick="closeModal('managesecretKeysModal');">&times;</span>
         <h2 style="text-align: center;">Secret Keys</h2>
         <table id="secretKeysTable">
           <thead>
@@ -486,19 +486,11 @@ async function openManageMasterModal() {
   });
 }
 
-function closeManageMasterModal() {
-  closeModal("manageMasterModal");
-}
-
 async function openManagesecretKeysModal() {
   openModal("managesecretKeysModal", async () => {
     await updateDecryptionForKeys();
     rendersecretKeysTable();
   });
-}
-
-function closeManagesecretKeysModal() {
-  closeModal("managesecretKeysModal");
 }
 
 function renderMasterKeysTable() {
@@ -841,21 +833,21 @@ function initEventListeners() {
     updateEncButton();
   });
 
-	window.addEventListener("click", function (event) {
-	  const modals = [
-		{ element: document.getElementById("manageMasterModal"), closeFunction: closeManageMasterModal },
-		{ element: document.getElementById("managesecretKeysModal"), closeFunction: closeManagesecretKeysModal },
-		{ element: document.getElementById("settingsModal"), closeFunction: closeSettingsModal }
-	  ];
+window.addEventListener("click", function (event) {
+  const modals = [
+    { element: document.getElementById("manageMasterModal"), closeFunction: () => closeModal("manageMasterModal") },
+    { element: document.getElementById("managesecretKeysModal"), closeFunction: () => closeModal("managesecretKeysModal") },
+    { element: document.getElementById("settingsModal"), closeFunction: () => closeModal("settingsModal") }
+  ];
 
-	  modals.forEach(modal => {
-		if (event.target === modal.element) {
-		  modal.closeFunction();
-		}
-	  });
-	});
+  modals.forEach(modal => {
+    if (event.target === modal.element) {
+      modal.closeFunction();
+    }
+  });
+});
 	
-  document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", function () {
+document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", function () {
     masterKeysRevealed = !masterKeysRevealed;
     this.textContent = masterKeysRevealed ? "Hide master keys" : "Reveal master keys";
     renderMasterKeysTable();
