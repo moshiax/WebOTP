@@ -197,17 +197,6 @@ async function loadMasterKeys() {
         "Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)",
 		1
       );
-      if (!sessionEncKey) {
-        if (confirm("No key entered. Do you want to reset master keys?")) {
-          localStorage.removeItem("masterKeys");
-          localStorage.removeItem("masterKeysEncKeyHash");
-          masterKeys = [];
-          sessionEncKey = null;
-          break;
-        } else {
-          continue;
-        }
-      }
       if (sessionEncKey === "CLEAR MASTERKEYS") {
         localStorage.removeItem("masterKeys");
         localStorage.removeItem("masterKeysEncKeyHash");
@@ -735,7 +724,7 @@ async function importData(fromFile = false) {
   if (fromFile) {
     const fileInput = document.createElement("input");
     fileInput.type = "file";
-    fileInput.accept = ".keystore, text/plain";
+    fileInput.accept = ".keystore";
     fileInput.onchange = async (event) => {
       const file = event.target.files[0];
       if (!file) return;
