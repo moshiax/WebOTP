@@ -685,20 +685,18 @@ async function decryptKey(keyObj, mk) {
 // ================================
 // Export and Import
 // ================================
+
 async function exportData(toFile = false) {
-  const combined = { keys, masterKeys };
-  const combinedString = JSON.stringify(combined);
-  const combinedBase64 = base64EncodeUnicode(combinedString);
+  const combined = JSON.stringify({ keys, masterKeys });
   const password = await prompt("Enter password for exporting data:", 1);
   if (!password) return;
   try {
-    const encrypted = await encryptText(combinedBase64, password);
-    const finalExport = base64EncodeUnicode(encrypted);
+    const encrypted = await encryptText(combined, password);
     if (toFile) {
       const now = new Date();
       const timestamp = now.toISOString().replace(/[:.]/g, "-");
       const filename = `${timestamp}.keystore`;
-      const blob = new Blob([finalExport], { type: "text/plain" });
+      const blob = new Blob([encrypted], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -708,10 +706,10 @@ async function exportData(toFile = false) {
       alert("Data exported to file: " + filename);
     } else {
       try {
-        await navigator.clipboard.writeText(finalExport);
+        await navigator.clipboard.writeText(encrypted);
         alert("Data successfully exported and copied to clipboard!");
       } catch {
-        showCopyModal(finalExport);
+        showCopyModal(encrypted);
       }
     }
   } catch (e) {
@@ -745,10 +743,8 @@ async function processImport(input) {
   const password = await prompt("Enter password for importing data:", 1);
   if (!password) return;
   try {
-    const encrypted = base64DecodeUnicode(input);
-    const decryptedBase64 = await decryptText(encrypted, password);
-    const combinedString = base64DecodeUnicode(decryptedBase64);
-    const combined = JSON.parse(combinedString);
+    const decrypted = await decryptText(input, password);
+    const combined = JSON.parse(decrypted);
     mergeImportedKeys(combined.keys);
     mergeImportedMasterKeys(combined.masterKeys);
     saveKeys();
