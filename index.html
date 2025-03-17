@@ -16,7 +16,7 @@
     <main>
 <div id="keysContainer"></div>
 <div class="buttonContainer">
-  <button id="addKeyBtn" onclick="addKey()">Add key</button>
+  <button id="addKeyBtn" onclick="openModal('addKeyModal')">Add Key</button>
   <button class="addMasterKeyBtn" onclick="addMasterKey()">Add master key</button>
   <button id="managesecretKeysBtn" onclick="openManagesecretKeysModal()">My secret keys</button>
   <button id="manageMasterKeysBtn" onclick="openManageMasterModal()">My master keys</button>
@@ -57,6 +57,31 @@
         <div id="masterEncryptionControls" style="text-align: center; margin-top: 10px;"></div>
       </div>
     </div>
+	<div id="addKeyModal" class="modal">
+	  <div class="modal-content">
+		<span id="closeAddKeyModal" class="close" onclick="closeModal('addKeyModal');">&times;</span>
+		<h2 style="text-align: center;">Choose QR Source</h2>
+		<div style="text-align: center;">
+		  <button onclick="startCameraScan()">From Camera (QR)</button>
+		  <br>
+		  <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelection(event)">
+		  <button onclick="document.getElementById('file-input').click()">From Gallery (QR)</button>
+		  <br>
+		  <button onclick="addKey()">From Secret Key (TEXT)</button>
+		</div>
+	  </div>
+	</div>
+	<div id="qrScannerModal" class="modal">
+	  <div class="modal-content">
+		<span class="close" onclick="closeModal('qrScannerModal');">&times;</span>
+		<h2>Scan QR Code</h2>
+		<video id="video" width="300" height="300" autoplay></video>
+		<canvas id="canvas" style="display: none;"></canvas>
+		<div style="text-align: center;">
+		  <p id="qr-result">Waiting for QR scan...</p>
+		</div>
+	  </div>
+	</div>
     <div id="managesecretKeysModal" class="modal">
       <div id="managesecretKeysModalContent" class="modal-content">
         <span id="closeManagesecretKeysModal" class="close" onclick="closeModal('managesecretKeysModal');">&times;</span>
@@ -88,7 +113,7 @@
     </dialog>
 <div id="settingsModal" class="modal">
   <div id="settingsModalContent" class="modal-content">
-    <span id="closeSettingsModal" class="close" onclick="closeSettingsModal()">&times;</span>
+    <span id="closeSettingsModal" class="close" onclick="closeModal('settingsModal');">&times;</span>
     <h2 style="text-align: center;">Settings</h2>
 
     <div class="setting-item" style="display: flex; align-items: center; justify-content: space-between;">
@@ -112,17 +137,13 @@
 
     <script src="crypto.js"></script>
     <script src ="essentials.js"></script>
+	<script src="jsQR.js"></script>
 	<script>
-
 let PasswordHideOn;
 
 function openSettingsModal() {
   document.getElementById("settingsModal").style.display = "flex";
   document.getElementById("passwordHideOnSwitch").checked = (PasswordHideOn === 1);
-}
-
-function closeSettingsModal() {
-  document.getElementById("settingsModal").style.display = "none";
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -838,7 +859,9 @@ window.addEventListener("click", function (event) {
   const modals = [
     { element: document.getElementById("manageMasterModal"), closeFunction: () => closeModal("manageMasterModal") },
     { element: document.getElementById("managesecretKeysModal"), closeFunction: () => closeModal("managesecretKeysModal") },
-    { element: document.getElementById("settingsModal"), closeFunction: () => closeModal("settingsModal") }
+    { element: document.getElementById("settingsModal"), closeFunction: () => closeModal("settingsModal") },
+    { element: document.getElementById("addKeyModal"), closeFunction: () => closeModal("addKeyModal") },
+    { element: document.getElementById("qrScannerModal"), closeFunction: () => closeModal("qrScannerModal") }
   ];
 
   modals.forEach(modal => {
@@ -855,11 +878,140 @@ document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", 
   });
 }
 
-async function addKey() {
-  const title = await prompt("Enter key name:");
-  if (!title) return;
-  const keyValue = await prompt("Enter key value (secret):", 1);
-  if (!keyValue) return;
+
+function startCameraScan() {
+  closeModal('addKeyModal');
+  openModal('qrScannerModal');
+  startCamera();
+}
+
+function handleFileSelection(event) {
+  const file = event.target.files[0];
+  if (file) {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      img.src = e.target.result;
+      img.onload = function() {
+        parseQRCode(img);
+      };
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function startCamera() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+      video.srcObject = stream;
+      video.setAttribute("playsinline", true);
+      video.play();
+      requestAnimationFrame(scanQRCode);
+    })
+    .catch(err => console.error(err));
+}
+
+function stopCamera() {
+  const video = document.getElementById('video');
+  const stream = video.srcObject;
+  const tracks = stream.getTracks();
+  tracks.forEach(track => track.stop());
+  video.srcObject = null;
+}
+
+function scanQRCode() {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+
+    if (qrCode) {
+      parseQRCodeFromText(qrCode.data);
+      closeQRScannerModal();
+    }
+  }
+  requestAnimationFrame(scanQRCode);
+}
+
+function parseQRCode(image) {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = image.width;
+  canvas.height = image.height;
+  ctx.drawImage(image, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+
+  if (qrCode) {
+    parseQRCodeFromText(qrCode.data);
+  } else {
+    alert('QR code not found.');
+  }
+}
+
+function parseQRCodeFromText(qrText) {
+  console.log('Received QR text:', qrText);
+
+  const decodedQRText = decodeURIComponent(qrText);
+  console.log('Decoded QR text:', decodedQRText);
+
+  const prefix = 'otpauth://totp/';
+  if (!decodedQRText.startsWith(prefix)) {
+    console.log('QR text does not start with expected prefix.');
+    alert('Invalid QR code format: Missing "otpauth://totp/" prefix.');
+    return;
+  }
+
+  const remainingText = decodedQRText.slice(prefix.length);
+  const parts = remainingText.split('?secret=');
+  if (parts.length !== 2) {
+    console.log('Could not find secret part in QR code.');
+    alert('Invalid QR code format: Missing "secret=".');
+    return;
+  }
+
+  const title = parts[0];
+  const keyValueWithIssuer = parts[1];
+
+  const issuerMatch = keyValueWithIssuer.match(/&issuer=([a-zA-Z0-9@.]+)/);
+  if (!issuerMatch) {
+    console.log('Could not find issuer in QR code.');
+    alert('Invalid QR code format: Missing "issuer=".');
+    return;
+  }
+
+  const issuer = issuerMatch[1];
+  const keyValue = keyValueWithIssuer.split('&')[0];
+
+  console.log('Parsed QR code:');
+  console.log('Title:', title);
+  console.log('Secret:', keyValue);
+  console.log('Issuer:', issuer);
+
+  addKey(title, keyValue);
+}
+
+async function addKey(title = null, keyValue = null) {
+  if (!title) {
+    title = await prompt("Enter key name:");
+    if (!title) return;
+  }
+
+  if (!keyValue) {
+    keyValue = await prompt("Enter key value (secret):", 1);
+    if (!keyValue) return;
+  }
+
   const selectedMasterKey = await chooseMasterKey();
   if (!selectedMasterKey) return;
   try {
@@ -877,6 +1029,7 @@ async function addKey() {
     saveKeys();
     renderKeys();
     updateAllKeyCards();
+	closeModal('addKeyModal');
     if (document.getElementById("managesecretKeysModal").style.display !== "none") {
       rendersecretKeysTable();
     }
