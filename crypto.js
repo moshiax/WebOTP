@@ -40,6 +40,16 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
+function base64ToUint8Array(base64) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+	bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
 async function deriveKey(password, salt) {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveKey']);

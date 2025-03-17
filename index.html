@@ -21,7 +21,7 @@
   <button id="managesecretKeysBtn" onclick="openManagesecretKeysModal()">My secret keys</button>
   <button id="manageMasterKeysBtn" onclick="openManageMasterModal()">My master keys</button>
   <br/>
-  <button id="clearStorageBtn" onclick="clearStorage()">Clear All Data</button>
+  <button id="clearStorageBtn">Clear All Data</button>
   <button id="settingsBtn" onclick="openSettingsModal()">Settings</button>
 </div>
 
@@ -137,7 +137,8 @@
 
     <script src="crypto.js"></script>
     <script src ="essentials.js"></script>
-	<script src="jsQR.js"></script>
+	<script src="external/jsQR.js"></script>
+	<script src="external/protobuf.js"></script>
 	<script>
 let PasswordHideOn;
 
@@ -359,138 +360,163 @@ function deleteKey(keyObj) {
 }
 
 function createKeyCard(keyObj) {
-	const card = document.createElement("div");
-	card.className = "key-card";
-	card.id = "key-" + keyObj.id;
+  const card = document.createElement("div");
+  card.className = "key-card";
+  card.id = "key-" + keyObj.id;
 
-	const delBtn = document.createElement("button");
-	delBtn.className = "delete-btn";
-	delBtn.innerHTML = "&times;";
-	delBtn.title = "Delete this key";
-	delBtn.onclick = () => deleteKey(keyObj);
-	card.appendChild(delBtn);
+  const delBtn = document.createElement("button");
+  delBtn.className = "delete-btn";
+  delBtn.innerHTML = "&times;";
+  delBtn.title = "Delete this key";
+  delBtn.onclick = () => deleteKey(keyObj);
+  card.appendChild(delBtn);
 
-	const publicDiv = document.createElement("div");
-	publicDiv.className = "public-values";
+  const publicDiv = document.createElement("div");
+  publicDiv.className = "public-values";
 
-	const titleDiv = document.createElement("div");
-	titleDiv.className = "title";
-	titleDiv.innerHTML =
-		'<strong>Name:</strong> <span class="editable-title" data-key-id="' +
-		keyObj.id +
-		'" contenteditable="true" spellcheck="false">' +
-		keyObj.title +
-		"</span>";
-	publicDiv.appendChild(titleDiv);
+  const titleDiv = document.createElement("div");
+  titleDiv.className = "title";
+  titleDiv.innerHTML =
+    '<strong>Name:</strong> <span class="editable-title" data-key-id="' +
+    keyObj.id +
+    '" contenteditable="true" spellcheck="false">' +
+    keyObj.title +
+    "</span>";
+  publicDiv.appendChild(titleDiv);
 
-	const otpDiv = document.createElement("div");
-	otpDiv.className = "otp";
-	otpDiv.innerHTML = "<strong>OTP:</strong> ";
+  const otpDiv = document.createElement("div");
+  otpDiv.className = "otp";
+  otpDiv.innerHTML = "<strong>OTP:</strong> ";
 
-	const otpSpan = document.createElement("span");
-	otpSpan.id = "otp-" + keyObj.id;
-	otpSpan.textContent = "N/A";
-	otpSpan.style.cursor = "pointer";
+  const otpSpan = document.createElement("span");
+  otpSpan.id = "otp-" + keyObj.id;
+  otpSpan.textContent = "N/A";
+  otpSpan.style.cursor = "pointer";
 
-	otpSpan.addEventListener("click", function () {
-		if (/^\d{6}$/.test(otpSpan.textContent)) {
-			navigator.clipboard.writeText(otpSpan.textContent).then(() => {
-				alert("OTP copied to clipboard!");
-			}).catch((e) => {
-				alert("Copy failed: " + e.message);
-			});
-		}
-	});
+  otpSpan.addEventListener("click", function () {
+    if (/^\d{6}$/.test(otpSpan.textContent)) {
+      navigator.clipboard.writeText(otpSpan.textContent).then(() => {
+        alert("OTP copied to clipboard!");
+      }).catch((e) => {
+        alert("Copy failed: " + e.message);
+      });
+    }
+  });
 
-	otpDiv.appendChild(otpSpan);
-	publicDiv.appendChild(otpDiv);
+  otpDiv.appendChild(otpSpan);
+  publicDiv.appendChild(otpDiv);
 
-	const statusWrapper = document.createElement("div");
-	statusWrapper.className = "status-wrapper";
+  const statusWrapper = document.createElement("div");
+  statusWrapper.className = "status-wrapper";
 
-	const statusContainer = document.createElement("div");
-	statusContainer.className = "status-container";
+  const statusContainer = document.createElement("div");
+  statusContainer.className = "status-container";
 
-	const statusLabel = document.createElement("strong");
-	statusLabel.textContent = "Status:";
+  const statusLabel = document.createElement("strong");
+  statusLabel.textContent = "Status:";
 
-	const statusSpan = document.createElement("span");
-	statusSpan.id = "status-" + keyObj.id;
-	statusSpan.className = "status";
-	statusSpan.textContent = "Unknown";
-	statusSpan.setAttribute("data-key-id", keyObj.id);
-	statusSpan.addEventListener("click", async function () {
-		const id = this.getAttribute("data-key-id");
-		const key = keys.find((k) => k.id === id);
-		if (!key) return;
-		const mk = getMatchingMasterKey(key);
-		if (mk) {
-			try {
-				const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
-				await navigator.clipboard.writeText(decryptedSecret);
-				alert("Secret copied to clipboard!");
-			} catch (e) {
-				alert("Copy failed: " + e.message);
-			}
-		}
-	});
+  const statusSpan = document.createElement("span");
+  statusSpan.id = "status-" + keyObj.id;
+  statusSpan.className = "status";
+  statusSpan.textContent = "Unknown";
+  statusSpan.setAttribute("data-key-id", keyObj.id);
+  statusSpan.addEventListener("click", async function () {
+    const id = this.getAttribute("data-key-id");
+    const key = keys.find((k) => k.id === id);
+    if (!key) return;
+    const mk = getMatchingMasterKey(key);
+    if (mk) {
+      try {
+        const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
+        await navigator.clipboard.writeText(decryptedSecret);
+        alert("Secret copied to clipboard!");
+      } catch (e) {
+        alert("Copy failed: " + e.message);
+      }
+    }
+  });
 
-	statusContainer.appendChild(statusLabel);
-	statusContainer.appendChild(statusSpan);
-	statusWrapper.appendChild(statusContainer);
+  statusContainer.appendChild(statusLabel);
+  statusContainer.appendChild(statusSpan);
+  statusWrapper.appendChild(statusContainer);
 
-	const progressContainer = document.createElement("div");
-	progressContainer.className = "otp-progress-container";
-	progressContainer.innerHTML = `
-		<div class="progress-container">
-			<div class="progress-circle"></div>
-			<div class="progress-fill" id="progress-${keyObj.id}"></div>
-		</div>
-	`;
-	statusWrapper.appendChild(progressContainer);
+  const progressContainer = document.createElement("div");
+  progressContainer.className = "otp-progress-container";
+  progressContainer.innerHTML = `
+    <div class="progress-container">
+      <div class="progress-circle"></div>
+      <div class="progress-fill" id="progress-${keyObj.id}"></div>
+    </div>
+  `;
+  statusWrapper.appendChild(progressContainer);
 
-	publicDiv.appendChild(statusWrapper);
-	card.appendChild(publicDiv);
+  publicDiv.appendChild(statusWrapper);
+  card.appendChild(publicDiv);
 
-	return card;
+  const editableTitle = card.querySelector(".editable-title");
+  editableTitle.addEventListener("blur", function () {
+    const keyId = this.getAttribute("data-key-id");
+    const keyObj = keys.find((k) => k.id === keyId);
+    if (keyObj) {
+      const newTitle = this.textContent.trim();
+      if (newTitle && newTitle !== keyObj.title) {
+        keyObj.title = newTitle;
+        saveKeys();
+        this.textContent = newTitle;
+        if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+          rendersecretKeysTable();
+        }
+      }
+    }
+  });
+
+  editableTitle.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      this.blur();
+    }
+  });
+
+  return card;
 }
 
 function renderKeys() {
   const container = document.getElementById("keysContainer");
   container.innerHTML = "";
   keys.forEach((keyObj) => {
-    container.appendChild(createKeyCard(keyObj));
+    const card = createKeyCard(keyObj);
+    container.appendChild(card);
   });
-  attachEditableTitleListeners();
 }
 
-function attachEditableTitleListeners() {
-  const editableTitles = document.querySelectorAll(".editable-title");
+function appendKeyCard(keyObj) {
+  const container = document.getElementById("keysContainer");
+  const keyCard = createKeyCard(keyObj);
+  container.appendChild(keyCard);
+}
 
-  editableTitles.forEach((span) => {
-    span.addEventListener("blur", function () {
-      const keyId = this.getAttribute("data-key-id");
-      const keyObj = keys.find((k) => k.id === keyId);
-      if (keyObj) {
-        const newTitle = this.textContent.trim();
-        if (newTitle && newTitle !== keyObj.title) {
-          keyObj.title = newTitle;
-          saveKeys();
-
-          this.textContent = newTitle;
-          if (document.getElementById("managesecretKeysModal").style.display !== "none") {
-            rendersecretKeysTable();
-          }
+function attachEditableTitleListenerToCard(cardElement) {
+  const titleElem = cardElement.querySelector(".editable-title");
+  if (!titleElem) return;
+  titleElem.addEventListener("blur", function () {
+    const keyId = this.getAttribute("data-key-id");
+    const keyObj = keys.find((k) => k.id === keyId);
+    if (keyObj) {
+      const newTitle = this.textContent.trim();
+      if (newTitle && newTitle !== keyObj.title) {
+        keyObj.title = newTitle;
+        saveKeys();
+        if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+          rendersecretKeysTable();
         }
       }
-    });
-
-    span.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        this.blur();
-      }
-    });
+    }
+  });
+  titleElem.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      this.blur();
+    }
   });
 }
 
@@ -576,13 +602,16 @@ function updateAffectedKeys(deletedHash) {
   keys.forEach((keyObj) => {
     if (keyObj.encryptionHash === deletedHash) {
       keyObj.decryptedSecret = null;
+      const statusElement = document.getElementById(`status-${keyObj.id}`);
+      
       if (statusElement) {
-        statusElement.textContent = "Encrypted"; 
+        statusElement.textContent = "Encrypted";
+        statusElement.classList.add("status-encrypted");
+        statusElement.classList.remove("status-decrypted");
       }
     }
   });
 }
-
 
 function rendersecretKeysTable() {
   const tbody = document.querySelector("#secretKeysTable tbody");
@@ -925,6 +954,7 @@ function stopCamera() {
 function scanQRCode() {
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
+  canvas.willReadFrequently = true;
   const ctx = canvas.getContext('2d');
   const modal = document.getElementById('qrScannerModal');
 
@@ -950,6 +980,7 @@ function scanQRCode() {
 
 function parseQRCode(image) {
   const canvas = document.getElementById('canvas');
+  canvas.willReadFrequently = true;
   const ctx = canvas.getContext('2d');
   canvas.width = image.width;
   canvas.height = image.height;
@@ -965,18 +996,25 @@ function parseQRCode(image) {
 }
 
 function parseQRCodeFromText(qrText) {
-  console.log('Received QR text:', qrText);
 
-  const decodedQRText = decodeURIComponent(qrText);
-  console.log('Decoded QR text:', decodedQRText);
-
-  const prefix = 'otpauth://totp/';
-  if (!decodedQRText.startsWith(prefix)) {
-    console.log('QR text does not start with expected prefix.');
-    alert('Invalid QR code format: Missing "otpauth://totp/" prefix.');
+  if (qrText.startsWith('otpauth-migration://')) {
+    const urlObj = new URL(qrText);
+    let dataParam = urlObj.searchParams.get('data');
+    if (dataParam) {
+      dataParam = decodeURIComponent(dataParam);
+      parseOtpauthMigration(dataParam);
+    }
     return;
   }
 
+  const prefix = 'otpauth://totp/';
+  if (!qrText.startsWith(prefix)) {
+    console.log('QR text does not start with expected prefix.');
+    alert('Invalid QR code format.');
+    return;
+  }
+
+  const decodedQRText = decodeURIComponent(qrText);
   const remainingText = decodedQRText.slice(prefix.length);
   const parts = remainingText.split('?secret=');
   if (parts.length !== 2) {
@@ -989,21 +1027,46 @@ function parseQRCodeFromText(qrText) {
   const keyValueWithIssuer = parts[1];
 
   const issuerMatch = keyValueWithIssuer.match(/&issuer=([a-zA-Z0-9@.]+)/);
-  if (!issuerMatch) {
-    console.log('Could not find issuer in QR code.');
-    alert('Invalid QR code format: Missing "issuer=".');
-    return;
+  const issuer = issuerMatch ? issuerMatch[1] : '';
+
+  const keyValue = keyValueWithIssuer.split('&')[0];
+  if (issuer && !title.includes(issuer)) {
+    title = `${issuer}: ${title}`;
   }
 
-  const issuer = issuerMatch[1];
-  const keyValue = keyValueWithIssuer.split('&')[0];
-
-  console.log('Parsed QR code:');
-  console.log('Title:', title);
-  console.log('Secret:', keyValue);
-  console.log('Issuer:', issuer);
-
   addKey(title, keyValue);
+}
+
+function parseOtpauthMigration(dataParam) {
+  try {
+    if (!dataParam) throw new Error("data parameter is empty");
+
+    const bytes = base64ToUint8Array(dataParam);
+
+    const root = protobuf.parse(protoDefinition).root;
+    const MigrationPayload = root.lookupType("migration.MigrationPayload");
+    const payload = MigrationPayload.decode(bytes);
+
+    const object = MigrationPayload.toObject(payload, {
+      longs: String,
+      enums: String,
+      bytes: String,
+      defaults: true
+    });
+
+    object.otpParameters.forEach(param => {
+      let paramName = param.name;
+      const issuer = param.issuer || '';
+
+      if (issuer && !paramName.includes(issuer)) {
+        paramName = `${issuer}: ${paramName}`;
+      }
+
+      addKey(paramName, param.secret);
+    });
+  } catch (error) {
+    console.error("Error parsing otpauth-migration:", error.message);
+  }
 }
 
 async function addKey(title = null, keyValue = null) {
@@ -1019,6 +1082,7 @@ async function addKey(title = null, keyValue = null) {
 
   const selectedMasterKey = await chooseMasterKey();
   if (!selectedMasterKey) return;
+  
   try {
     const encrypted = await encryptText(keyValue, selectedMasterKey.password);
     const id = await sha256(title + keyValue);
@@ -1028,16 +1092,15 @@ async function addKey(title = null, keyValue = null) {
       encryptedKey: encrypted,
       encryptionHash: selectedMasterKey.hash,
     };
+
     if (!keys.find((k) => k.id === id)) {
       keys.push(keyObj);
     }
     saveKeys();
-    renderKeys();
-    updateAllKeyCards();
-	closeModal('addKeyModal');
-    if (document.getElementById("managesecretKeysModal").style.display !== "none") {
-      rendersecretKeysTable();
-    }
+    appendKeyCard(keyObj);
+    updateKeyCard(keyObj);
+    closeModal('addKeyModal');
+	
   } catch (e) {
     alert("Error encrypting key: " + e.message);
   }
@@ -1050,30 +1113,30 @@ async function chooseMasterKey() {
   if (masterKeys.length === 1) {
     return masterKeys[0];
   } else {
-    const options = masterKeys
-      .map(
-        (mk, idx) =>
-          (idx + 1) +
-          ": " +
-          mk.hash.substring(0, 6) +
-          "..." +
-          " (" +
-          mk.password.substring(0, 4) +
-          "...)"
-      )
-      .join("\n");
-    const choice = await prompt(
-      "Choose a master key for encryption:\n0. Add new master key\n" + options
-    );
-    const index = parseInt(choice) - 1;
-    if (index >= 0 && index < masterKeys.length) {
-      return masterKeys[index];
-    } else if (index === masterKeys.length) {
-      await addMasterKey();
-      return await chooseMasterKey();
-    } else {
-      alert("Invalid choice");
-      return null;
+    while (true) {
+      const options = masterKeys
+        .map(
+          (mk, idx) =>
+            (idx + 1) +
+            ": " +
+            mk.hash.substring(0, 6) +
+            "..." +
+            " (" +
+            mk.password.substring(0, 4) +
+            "...)"
+        )
+        .join("\n");
+      const choice = await prompt(
+        "Choose a master key for encryption:\n0. Add new master key\n" + options
+      );
+      const index = parseInt(choice) - 1;
+      if (index >= 0 && index < masterKeys.length) {
+        return masterKeys[index];
+      } else if (index === masterKeys.length) {
+        await addMasterKey();
+        return await chooseMasterKey();
+      } else {
+      }
     }
   }
 }
@@ -1099,7 +1162,6 @@ async function addMasterKey() {
     renderMasterKeysTable();
   }
 }
-
 
 function startOTPUpdater() {
   const now = Date.now();
