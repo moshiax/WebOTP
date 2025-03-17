@@ -5,7 +5,7 @@
 if (location.origin !== "null" && location.protocol !== "file:") {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker
-      .register("sw.js")
+      .register("webapp/sw.js")
       .then(() => console.log("sw registered"))
       .catch((error) => console.error("sw error:", error));
   }
