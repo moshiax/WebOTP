@@ -51,7 +51,7 @@
           <tbody></tbody>
         </table>
         <div style="text-align: center; margin-top: 20px;">
-          <button class="addMasterKeyBtn">Add master key</button>
+          <button class="addMasterKeyBtn" onclick="addMasterKey()">Add master key</button>
           <button id="toggleRevealMasterKeysBtn">Reveal master keys</button>
         </div>
         <div id="masterEncryptionControls" style="text-align: center; margin-top: 10px;"></div>
@@ -338,84 +338,100 @@ function deleteKey(keyObj) {
 }
 
 function createKeyCard(keyObj) {
-  const card = document.createElement("div");
-  card.className = "key-card";
-  card.id = "key-" + keyObj.id;
+	const card = document.createElement("div");
+	card.className = "key-card";
+	card.id = "key-" + keyObj.id;
 
-  const delBtn = document.createElement("button");
-  delBtn.className = "delete-btn";
-  delBtn.innerHTML = "&times;";
-  delBtn.title = "Delete this key";
-  delBtn.onclick = () => deleteKey(keyObj);
-  card.appendChild(delBtn);
+	const delBtn = document.createElement("button");
+	delBtn.className = "delete-btn";
+	delBtn.innerHTML = "&times;";
+	delBtn.title = "Delete this key";
+	delBtn.onclick = () => deleteKey(keyObj);
+	card.appendChild(delBtn);
 
-  const publicDiv = document.createElement("div");
-  publicDiv.className = "public-values";
+	const publicDiv = document.createElement("div");
+	publicDiv.className = "public-values";
 
-  const titleDiv = document.createElement("div");
-  titleDiv.className = "title";
-  titleDiv.innerHTML =
-    '<strong>Name:</strong> <span class="editable-title" data-key-id="' +
-    keyObj.id +
-    '" contenteditable="true" spellcheck="false">' +
-    keyObj.title +
-    "</span>";
-  publicDiv.appendChild(titleDiv);
+	const titleDiv = document.createElement("div");
+	titleDiv.className = "title";
+	titleDiv.innerHTML =
+		'<strong>Name:</strong> <span class="editable-title" data-key-id="' +
+		keyObj.id +
+		'" contenteditable="true" spellcheck="false">' +
+		keyObj.title +
+		"</span>";
+	publicDiv.appendChild(titleDiv);
 
-  const otpDiv = document.createElement("div");
-  otpDiv.className = "otp";
-  otpDiv.innerHTML =
-    '<strong>OTP:</strong> <span id="otp-' + keyObj.id + '">N/A</span>';
-  publicDiv.appendChild(otpDiv);
+	const otpDiv = document.createElement("div");
+	otpDiv.className = "otp";
+	otpDiv.innerHTML = "<strong>OTP:</strong> ";
 
-  const statusWrapper = document.createElement("div");
-  statusWrapper.className = "status-wrapper";
+	const otpSpan = document.createElement("span");
+	otpSpan.id = "otp-" + keyObj.id;
+	otpSpan.textContent = "N/A";
+	otpSpan.style.cursor = "pointer";
 
-  const statusContainer = document.createElement("div");
-  statusContainer.className = "status-container";
+	otpSpan.addEventListener("click", function () {
+		if (/^\d{6}$/.test(otpSpan.textContent)) {
+			navigator.clipboard.writeText(otpSpan.textContent).then(() => {
+				alert("OTP copied to clipboard!");
+			}).catch((e) => {
+				alert("Copy failed: " + e.message);
+			});
+		}
+	});
 
-  const statusLabel = document.createElement("strong");
-  statusLabel.textContent = "Status:";
+	otpDiv.appendChild(otpSpan);
+	publicDiv.appendChild(otpDiv);
 
-  const statusSpan = document.createElement("span");
-  statusSpan.id = "status-" + keyObj.id;
-  statusSpan.className = "status";
-  statusSpan.textContent = "Unknown";
-  statusSpan.setAttribute("data-key-id", keyObj.id);
-  statusSpan.addEventListener("click", async function () {
-    const id = this.getAttribute("data-key-id");
-    const key = keys.find((k) => k.id === id);
-    if (!key) return;
-    const mk = getMatchingMasterKey(key);
-    if (mk) {
-      try {
-        const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
-        await navigator.clipboard.writeText(decryptedSecret);
-        alert("Secret copied to clipboard!");
-      } catch (e) {
-        alert("Copy failed: " + e.message);
-      }
-    }
-  });
+	const statusWrapper = document.createElement("div");
+	statusWrapper.className = "status-wrapper";
 
-  statusContainer.appendChild(statusLabel);
-  statusContainer.appendChild(statusSpan);
-  statusWrapper.appendChild(statusContainer);
+	const statusContainer = document.createElement("div");
+	statusContainer.className = "status-container";
 
-  const progressContainer = document.createElement("div");
-  progressContainer.className = "otp-progress-container";
-  progressContainer.innerHTML = `
-    <div class="progress-container">
-      <div class="progress-circle"></div>
-      <div class="progress-fill" id="progress-${keyObj.id}"></div>
-    </div>
-  `;
-  statusWrapper.appendChild(progressContainer);
+	const statusLabel = document.createElement("strong");
+	statusLabel.textContent = "Status:";
 
-  publicDiv.appendChild(statusWrapper);
-  card.appendChild(publicDiv);
+	const statusSpan = document.createElement("span");
+	statusSpan.id = "status-" + keyObj.id;
+	statusSpan.className = "status";
+	statusSpan.textContent = "Unknown";
+	statusSpan.setAttribute("data-key-id", keyObj.id);
+	statusSpan.addEventListener("click", async function () {
+		const id = this.getAttribute("data-key-id");
+		const key = keys.find((k) => k.id === id);
+		if (!key) return;
+		const mk = getMatchingMasterKey(key);
+		if (mk) {
+			try {
+				const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
+				await navigator.clipboard.writeText(decryptedSecret);
+				alert("Secret copied to clipboard!");
+			} catch (e) {
+				alert("Copy failed: " + e.message);
+			}
+		}
+	});
 
-  return card;
+	statusContainer.appendChild(statusLabel);
+	statusContainer.appendChild(statusSpan);
+	statusWrapper.appendChild(statusContainer);
+
+	const progressContainer = document.createElement("div");
+	progressContainer.className = "otp-progress-container";
+	progressContainer.innerHTML = `
+		<div class="progress-container">
+			<div class="progress-circle"></div>
+			<div class="progress-fill" id="progress-${keyObj.id}"></div>
+		</div>
+	`;
+	statusWrapper.appendChild(progressContainer);
+
+	publicDiv.appendChild(statusWrapper);
+	card.appendChild(publicDiv);
+
+	return card;
 }
 
 function renderKeys() {
