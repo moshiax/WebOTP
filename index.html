@@ -878,7 +878,6 @@ document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", 
   });
 }
 
-
 function startCameraScan() {
   closeModal('addKeyModal');
   openModal('qrScannerModal');
@@ -917,16 +916,22 @@ function startCamera() {
 
 function stopCamera() {
   const video = document.getElementById('video');
-  const stream = video.srcObject;
-  const tracks = stream.getTracks();
-  tracks.forEach(track => track.stop());
-  video.srcObject = null;
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(track => track.stop());
+    video.srcObject = null;
+  }
 }
 
 function scanQRCode() {
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
+  const modal = document.getElementById('qrScannerModal');
+
+  if (modal.style.display !== "flex") {
+    stopCamera();
+    return;
+  }
 
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
     canvas.height = video.videoHeight;
@@ -937,7 +942,7 @@ function scanQRCode() {
 
     if (qrCode) {
       parseQRCodeFromText(qrCode.data);
-      closeQRScannerModal();
+      closeModal("qrScannerModal");
     }
   }
   requestAnimationFrame(scanQRCode);
@@ -980,7 +985,7 @@ function parseQRCodeFromText(qrText) {
     return;
   }
 
-  const title = parts[0];
+  let title = parts[0].replace(':', ': ');
   const keyValueWithIssuer = parts[1];
 
   const issuerMatch = keyValueWithIssuer.match(/&issuer=([a-zA-Z0-9@.]+)/);
