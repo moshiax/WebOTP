@@ -313,8 +313,7 @@ function updateEncButton() {
   controlsDiv.innerHTML = "";
   const button = document.createElement("button");
   if (sessionEncKey) {
-    button.textContent = "Master keys encrypted";
-    button.style.backgroundColor = "#22863a";
+    button.style.display = "none";
   } else {
     button.textContent = "Master keys unencrypted!";
     button.style.backgroundColor = "#d73a49";
