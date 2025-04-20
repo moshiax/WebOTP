@@ -64,7 +64,7 @@
 		<div style="text-align: center;">
 		  <button onclick="startCameraScan()">From Camera (QR)</button>
 		  <br>
-		  <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelection(event)">
+		  <input type="file" id="file-input" accept="image/*" style="display: none;" multiple onchange="handleFileSelection(event)">
 		  <button onclick="document.getElementById('file-input').click()">From Gallery (QR)</button>
 		  <br>
 		  <button onclick="addKey()">From Secret Key (TEXT)</button>
@@ -913,18 +913,20 @@ function startCameraScan() {
 }
 
 function handleFileSelection(event) {
-  const file = event.target.files[0];
-  if (file) {
-    const img = new Image();
+  const files = Array.from(event.target.files);
+  files.forEach(file => {
     const reader = new FileReader();
+    const img = new Image();
+
     reader.onload = function(e) {
       img.src = e.target.result;
       img.onload = function() {
         parseQRCode(img);
       };
     };
+
     reader.readAsDataURL(file);
-  }
+  });
 }
 
 function startCamera() {
