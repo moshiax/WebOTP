@@ -267,22 +267,24 @@ async function saveMasterKeys() {
   updateURL();
 }
 
-async function handleMasterKeysEncryption(promptText, successMessage) {
-  const newKey = await prompt(promptText, 1);
+async function changeMasterKeysEncryptionKey() {
+  const newKey = await prompt("Enter a new key for encrypting master keys:", 1);
   if (!newKey) return;
   sessionEncKey = newKey;
   await saveMasterKeys();
-  alert(successMessage);
+  alert("Master keys encryption key successfully changed.");
   updateEncButton();
   updateMasterEncryptionControls();
 }
 
-function enableMasterKeysEncryption() {
-  handleMasterKeysEncryption("Enter the key to encrypt master keys:", "Master keys are now encrypted.");
-}
-
-function changeMasterKeysEncryptionKey() {
-  handleMasterKeysEncryption("Enter a new key for encrypting master keys:", "Master keys encryption key successfully changed.");
+async function enableMasterKeysEncryption() {
+  const newKey = await prompt("Enter the key to encrypt master keys:", 1);
+  if (!newKey) return;
+  sessionEncKey = newKey;
+  await saveMasterKeys();
+  alert("Master keys are now encrypted.");
+  updateEncButton();
+  updateMasterEncryptionControls();
 }
 
 async function disableMasterKeysEncryption() {
