@@ -219,7 +219,6 @@ async function loadMasterKeys() {
         "Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)",
 		1
       );
-	  sessionEncKey = await deriveKey(sessionEncKey)
       if (sessionEncKey === "CLEAR MASTERKEYS") {
         localStorage.removeItem("masterKeys");
         localStorage.removeItem("masterKeysEncKeyHash");
@@ -268,24 +267,24 @@ async function saveMasterKeys() {
   updateURL();
 }
 
-async function handleMasterKeysEncryption(promptText, successMessage) {
-  const password = await prompt(promptText, 1);
-  if (!password) return;
-
-  sessionEncKey = await deriveKey(password);
-
+async function changeMasterKeysEncryptionKey() {
+  const newKey = await prompt("Enter a new key for encrypting master keys:", 1);
+  if (!newKey) return;
+  sessionEncKey = newKey;
   await saveMasterKeys();
-  alert(successMessage);
+  alert("Master keys encryption key successfully changed.");
   updateEncButton();
   updateMasterEncryptionControls();
 }
 
-function enableMasterKeysEncryption() {
-  handleMasterKeysEncryption("Enter the key to encrypt master keys:", "Master keys are now encrypted.");
-}
-
-function changeMasterKeysEncryptionKey() {
-  handleMasterKeysEncryption("Enter a new key for encrypting master keys:", "Master keys encryption key successfully changed.");
+async function enableMasterKeysEncryption() {
+  const newKey = await prompt("Enter the key to encrypt master keys:", 1);
+  if (!newKey) return;
+  sessionEncKey = newKey;
+  await saveMasterKeys();
+  alert("Master keys are now encrypted.");
+  updateEncButton();
+  updateMasterEncryptionControls();
 }
 
 async function disableMasterKeysEncryption() {
@@ -756,10 +755,8 @@ async function exportData(toFile = false) {
   const combined = JSON.stringify({ keys, masterKeys });
   const password = await prompt("Enter password for exporting data:", 1);
   if (!password) return;
-
   try {
-    const derivedKey = await deriveKey(password);
-    const encrypted = await encryptText(combined, derivedKey);
+    const encrypted = await encryptText(combined, password);
     if (toFile) {
       const now = new Date();
       const timestamp = now.toISOString().replace(/[:.]/g, "-");
@@ -785,26 +782,6 @@ async function exportData(toFile = false) {
   }
 }
 
-async function processImport(input) {
-  const password = await prompt("Enter password for importing data:", 1);
-  if (!password) return;
-  try {
-    const derivedKey = await deriveKey(password);
-    const decrypted = await decryptText(input, derivedKey);
-    const combined = JSON.parse(decrypted);
-    mergeImportedKeys(combined.keys);
-    mergeImportedMasterKeys(combined.masterKeys);
-    saveKeys();
-    await saveMasterKeys();
-    await updateDecryptionForKeys();
-    renderKeys();
-    updateAllKeyCards();
-    alert("Data imported successfully!");
-  } catch (e) {
-    alert("Error importing data: " + e.message);
-  }
-}
-
 async function importData(fromFile = false) {
   let input;
   if (fromFile) {
@@ -824,6 +801,25 @@ async function importData(fromFile = false) {
   } else {
     input = await prompt("Paste the string to import data:");
     if (input) await processImport(input.trim());
+  }
+}
+
+async function processImport(input) {
+  const password = await prompt("Enter password for importing data:", 1);
+  if (!password) return;
+  try {
+    const decrypted = await decryptText(input, password);
+    const combined = JSON.parse(decrypted);
+    mergeImportedKeys(combined.keys);
+    mergeImportedMasterKeys(combined.masterKeys);
+    saveKeys();
+    await saveMasterKeys();
+    await updateDecryptionForKeys();
+    renderKeys();
+    updateAllKeyCards();
+    alert("Data imported successfully!");
+  } catch (e) {
+    alert("Error importing data: " + e.message);
   }
 }
 
