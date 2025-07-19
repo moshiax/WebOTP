@@ -64,29 +64,49 @@ window.alert = function (message) {
 // Custom Prompt
 // ================================
 
-function customPrompt(text, isPassword = 0) {
+function customPrompt(text, isPassword = 0, noEscape = 0) {
   return new Promise((resolve) => {
     const promptDialog = document.getElementById("customPromptDialog");
     const promptText = document.getElementById("customPromptText");
     const promptInput = document.getElementById("customPromptInput");
     const okBtn = document.getElementById("customPromptOk");
     const cancelBtn = document.getElementById("customPromptCancel");
-    
+
     promptText.innerText = text;
     promptInput.value = "";
+
     if (PasswordHideOn === 0) {
       promptInput.type = "text";
     } else {
       promptInput.type = isPassword ? "password" : "text";
     }
-    
+
     okBtn.disabled = true;
     promptDialog.showModal();
+
+    function blockEscape(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+      }
+    }
+
+    if (noEscape === 1) {
+      promptDialog.addEventListener("cancel", preventCancel);
+      document.addEventListener("keydown", blockEscape);
+    }
+
+    function preventCancel(e) {
+      e.preventDefault();
+    }
 
     function cleanup() {
       okBtn.removeEventListener("click", onOk);
       cancelBtn.removeEventListener("click", onCancel);
-	  promptInput.type = "text";
+      if (noEscape === 1) {
+        document.removeEventListener("keydown", blockEscape);
+        promptDialog.removeEventListener("cancel", preventCancel);
+      }
+      promptInput.type = "text";
       promptDialog.close();
     }
 

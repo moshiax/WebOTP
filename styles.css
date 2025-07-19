@@ -443,6 +443,15 @@ dialog#customPromptDialog input {
   text-align: center;
 }
 
+.close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #c9d1d9;
+}
+
 dialog#customPromptDialog button {
   padding: 8px 16px;
   margin: 5px;
@@ -451,23 +460,9 @@ dialog#customPromptDialog button {
   cursor: pointer;
 }
 
-dialog#customPromptDialog button#customPromptOk {
-  background: #238636;
-  color: white;
-}
-
 dialog#customPromptDialog button#customPromptCancel {
   background: #d73a49;
   color: white;
-}
-
-.close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  font-size: 24px;
-  cursor: pointer;
-  color: #c9d1d9;
 }
 
 dialog#customPromptDialog button#customPromptOk {

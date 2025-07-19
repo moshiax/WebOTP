@@ -217,6 +217,7 @@ async function loadMasterKeys() {
     while (!validKey) {
       sessionEncKey = await prompt(
         "Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)",
+		1,
 		1
       );
       if (sessionEncKey === "CLEAR MASTERKEYS") {
@@ -703,7 +704,7 @@ async function updateKeyCard(keyObj) {
       otpSpan.textContent = otp;
       statusSpan.textContent = "Decrypted";
       statusSpan.className = "status status-decrypted";
-    } catch (e) {
+    } catch (_) {
       otpSpan.textContent = "N/A";
       statusSpan.textContent = "Decryption error";
       statusSpan.className = "status status-failed";
@@ -932,7 +933,6 @@ function handleFileSelection(event) {
 function startCamera() {
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => {
@@ -1136,7 +1136,6 @@ async function chooseMasterKey() {
       } else if (index === masterKeys.length) {
         await addMasterKey();
         return await chooseMasterKey();
-      } else {
       }
     }
   }
