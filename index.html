@@ -932,7 +932,6 @@ function handleFileSelection(event) {
 
 function startCamera() {
   const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => {
