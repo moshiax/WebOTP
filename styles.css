@@ -511,7 +511,6 @@ dialog#customPromptDialog button#customPromptOk:disabled {
   height: 0;
 }
 
-/* Слайдер */
 .switch .slider {
   position: absolute;
   cursor: pointer;
