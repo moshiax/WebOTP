@@ -111,18 +111,26 @@
         </div>
       </form>
     </dialog>
-<div id="settingsModal" class="modal">
-  <div id="settingsModalContent" class="modal-content">
-    <span id="closeSettingsModal" class="close" onclick="closeModal('settingsModal');">&times;</span>
-    <h2 style="text-align: center;">Settings</h2>
+	<div id="settingsModal" class="modal">
+	  <div id="settingsModalContent" class="modal-content">
+		<span id="closeSettingsModal" class="close" onclick="closeModal('settingsModal');">&times;</span>
+		<h2 style="text-align: center;">Settings</h2>
 
-    <div class="setting-item" style="display: flex; align-items: center; justify-content: space-between;">
-      <label for="passwordHideOnSwitch" style="display: inline-block;">Hide Password Input</label>
-      <label class="switch">
-        <input type="checkbox" id="passwordHideOnSwitch" />
-        <span class="slider round"></span>
-      </label>
-    </div>
+		<div class="setting-item" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1em;">
+		  <label for="passwordHideOnSwitch" style="display: inline-block;">Hide Password Input</label>
+		  <label class="switch">
+			<input type="checkbox" id="passwordHideOnSwitch" />
+			<span class="slider round"></span>
+		  </label>
+		</div>
+
+		<div class="setting-item" style="display: flex; align-items: center; justify-content: space-between;">
+		  <label for="cacheModeSwitch" style="display: inline-block;">Offline Mode</label>
+		  <label class="switch">
+			<input type="checkbox" id="cacheModeSwitch" />
+			<span class="slider round"></span>
+		  </label>
+		</div>
 
     <div id="additionalSettings" style="text-align: center; margin-top: 20px;">
       <div class="buttonContainer">
@@ -141,28 +149,65 @@
 	<script src="external/protobuf.js"></script>
 	<script>
 let PasswordHideOn;
+let offlineMode;
 
 function openSettingsModal() {
-  document.getElementById("settingsModal").style.display = "flex";
-  document.getElementById("passwordHideOnSwitch").checked = (PasswordHideOn === 1);
+	document.getElementById("settingsModal").style.display = "flex";
+	document.getElementById("passwordHideOnSwitch").checked = (PasswordHideOn === 1);
+	document.getElementById("cacheModeSwitch").checked = (offlineMode === true);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  PasswordHideOn = localStorage.getItem('passwordHideOn');
-  
-  if (PasswordHideOn === null) {
-    PasswordHideOn = /mobile/i.test(navigator.userAgent) ? 0 : 1;
-  } else {
-    PasswordHideOn = parseInt(PasswordHideOn, 10);
-  }
+	PasswordHideOn = localStorage.getItem('passwordHideOn');
 
-  const checkbox = document.getElementById("passwordHideOnSwitch");
-  checkbox.checked = PasswordHideOn === 1;
+	if (PasswordHideOn === null) {
+		PasswordHideOn = /mobile/i.test(navigator.userAgent) ? 0 : 1;
+	} else {
+		PasswordHideOn = parseInt(PasswordHideOn, 10);
+	}
 
-  checkbox.addEventListener('change', function() {
-    PasswordHideOn = this.checked ? 1 : 0;
-    localStorage.setItem('passwordHideOn', PasswordHideOn);
-  });
+	offlineMode = localStorage.getItem('offlineMode');
+	if (offlineMode === null) {
+		offlineMode = true;
+	} else {
+		offlineMode = offlineMode === 'true';
+	}
+
+	const passwordCheckbox = document.getElementById("passwordHideOnSwitch");
+	passwordCheckbox.checked = PasswordHideOn === 1;
+
+	const cacheCheckbox = document.getElementById("cacheModeSwitch");
+	cacheCheckbox.checked = offlineMode;
+
+	passwordCheckbox.addEventListener('change', function() {
+		PasswordHideOn = this.checked ? 1 : 0;
+		localStorage.setItem('passwordHideOn', PasswordHideOn);
+	});
+
+	cacheCheckbox.addEventListener('change', async function() {
+		if (!this.checked) {
+			const confirmDisable = await customPrompt(
+				'Warning! Disabling offline mode can expose your data to arbitrary code if the hosting environment is compromised. Please type "yes" to confirm.',
+				0,
+				0
+			);
+
+			if (confirmDisable === null || confirmDisable.trim().toLowerCase() !== 'yes') {
+				this.checked = true;
+				return;
+			}
+		}
+
+		offlineMode = this.checked;
+		localStorage.setItem('offlineMode', offlineMode);
+
+		if (navigator.serviceWorker.controller) {
+			navigator.serviceWorker.controller.postMessage({
+				type: 'SET_OFFLINE_MODE',
+				value: offlineMode
+			});
+		}
+	});
 });
 
 // ================================
