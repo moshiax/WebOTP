@@ -1,17 +1,18 @@
 const CACHE_NAME = 'my-cache-v1';
+const BASE_URL = self.location.origin;
 
 const URLS_TO_CACHE = [
-	'/',
-	'/index.html',
-	'/crypto.js',
-	'/essentials.js',
-	'/manifest.json',
-	'/styles.css',
-	'/sw.js',
-	'/external/jsQR.js',
-	'/external/protobuf.js',
-	'/icon.png',
-	'/demo.png'
+    '/',
+    'index.html',
+    'crypto.js',
+    'essentials.js',
+    'manifest.json',
+    'styles.css',
+    'external/jsQR.js',
+    'external/protobuf.js',
+    'icon.png',
+    'demo.png',
+	'sw.js'
 ];
 
 let offlineMode = true;
@@ -22,9 +23,11 @@ self.addEventListener('install', event => {
 			for (const url of URLS_TO_CACHE) {
 				try {
 					if (url.startsWith('chrome-extension://')) continue;
-					await cache.add(url);
+					const fullUrl = new URL(url, self.location.origin).href;
+					console.log('Caching resource from URL:', fullUrl);
+					await cache.add(fullUrl);
 				} catch (err) {
-					console.warn('Failed to cache', url, err);
+					console.warn('Failed to cache', url, 'at full URL:', new URL(url, self.location.origin).href, err);
 				}
 			}
 		}).then(() => {
