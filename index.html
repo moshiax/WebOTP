@@ -204,7 +204,8 @@ document.addEventListener('DOMContentLoaded', function() {
 		if (navigator.serviceWorker.controller) {
 			navigator.serviceWorker.controller.postMessage({
 				type: 'SET_OFFLINE_MODE',
-				value: offlineMode
+				value: offlineMode,
+				origin: window.location.origin
 			});
 		}
 	});

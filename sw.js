@@ -43,9 +43,16 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('message', event => {
-	if (event.data && event.data.type === 'SET_OFFLINE_MODE') {
-		offlineMode = event.data.value;
-	}
+  const allowedOrigin = new URL(self.location.href).origin;
+  if (event.origin !== allowedOrigin) {
+    console.warn(`Rejected message from unauthorized origin: ${event.origin}`);
+    return;
+  }
+
+  if (event.data && event.data.type === 'SET_OFFLINE_MODE') {
+    offlineMode = event.data.value;
+    console.log(`Offline mode set to: ${offlineMode}`);
+  }
 });
 
 self.addEventListener('fetch', event => {
