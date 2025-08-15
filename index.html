@@ -115,100 +115,61 @@
 	  <div id="settingsModalContent" class="modal-content">
 		<span id="closeSettingsModal" class="close" onclick="closeModal('settingsModal');">&times;</span>
 		<h2 style="text-align: center;">Settings</h2>
-
-		<div class="setting-item" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1em;">
-		  <label for="passwordHideOnSwitch" style="display: inline-block;">Hide Password Input</label>
-		  <label class="switch">
-			<input type="checkbox" id="passwordHideOnSwitch" />
-			<span class="slider round"></span>
-		  </label>
+		<div id="settingsContainer"></div>
+		<div id="additionalSettings" style="text-align: center; margin-top: 20px;">
+		  <div class="buttonContainer">
+			<button id="exportTextBtn" onclick="exportData(false)">Export String</button>
+			<button id="exportFileBtn" onclick="exportData(true)">Export File</button>
+			<button id="importTextBtn" onclick="importData(false)">Import String</button>
+			<button id="importFileBtn" onclick="importData(true)">Import File</button>
+		  </div>
 		</div>
-
-		<div class="setting-item" style="display: flex; align-items: center; justify-content: space-between;">
-		  <label for="cacheModeSwitch" style="display: inline-block;">Offline Mode</label>
-		  <label class="switch">
-			<input type="checkbox" id="cacheModeSwitch" />
-			<span class="slider round"></span>
-		  </label>
-		</div>
-
-    <div id="additionalSettings" style="text-align: center; margin-top: 20px;">
-      <div class="buttonContainer">
-        <button id="exportTextBtn" onclick="exportData(false)">Export String</button>
-        <button id="exportFileBtn" onclick="exportData(true)">Export File</button>
-        <button id="importTextBtn" onclick="importData(false)">Import String</button>
-        <button id="importFileBtn" onclick="importData(true)">Import File</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-    <script src="crypto.js"></script>
-    <script src ="essentials.js"></script>
-	<script src="external/jsQR.js"></script>
-	<script src="external/protobuf.js"></script>
-	<script>
-let PasswordHideOn;
-let offlineMode;
-
-function openSettingsModal() {
-	document.getElementById("settingsModal").style.display = "flex";
-	document.getElementById("passwordHideOnSwitch").checked = (PasswordHideOn === 1);
-	document.getElementById("cacheModeSwitch").checked = (offlineMode === true);
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-	PasswordHideOn = localStorage.getItem('passwordHideOn');
-
-	if (PasswordHideOn === null) {
-		PasswordHideOn = /mobile/i.test(navigator.userAgent) ? 0 : 1;
-	} else {
-		PasswordHideOn = parseInt(PasswordHideOn, 10);
-	}
-
-	offlineMode = localStorage.getItem('offlineMode');
-	if (offlineMode === null) {
-		offlineMode = true;
-	} else {
-		offlineMode = offlineMode === 'true';
-	}
-
-	const passwordCheckbox = document.getElementById("passwordHideOnSwitch");
-	passwordCheckbox.checked = PasswordHideOn === 1;
-
-	const cacheCheckbox = document.getElementById("cacheModeSwitch");
-	cacheCheckbox.checked = offlineMode;
-
-	passwordCheckbox.addEventListener('change', function() {
-		PasswordHideOn = this.checked ? 1 : 0;
-		localStorage.setItem('passwordHideOn', PasswordHideOn);
-	});
-
-	cacheCheckbox.addEventListener('change', async function() {
-		if (!this.checked) {
-			const confirmDisable = await customPrompt(
-				'Warning! Disabling offline mode can expose your data to arbitrary code if the hosting environment is compromised. Please type "yes" to confirm.',
-				0,
-				0
-			);
-
-			if (confirmDisable === null || confirmDisable.trim().toLowerCase() !== 'yes') {
-				this.checked = true;
-				return;
+	  </div>
+	</div>
+<script src="crypto.js"></script>
+<script src ="essentials.js"></script>
+<script src="external/jsQR.js"></script>
+<script src="external/protobuf.js"></script>
+<script>
+const settings = {
+    passwordHideOn: {
+        label: "Hide Password Input",
+        type: "checkbox",
+        default: !/mobile/i.test(navigator.userAgent),
+    },
+	offlineMode: {
+		label: "Offline Mode",
+		type: "checkbox",
+		default: true,
+		onChange: async (value) => {
+			if (!value && window.location.protocol !== 'file:') {
+				const confirmDisable = await customPrompt(
+					'Warning! Disabling offline mode can expose your data to arbitrary code if hosted externally and the environment compromised. Type "yes" to confirm.',
+					0, 0
+				);
+				if (confirmDisable?.trim().toLowerCase() !== 'yes') return false;
 			}
+			navigator.serviceWorker?.controller?.postMessage({ type: 'SET_OFFLINE_MODE', value });
 		}
+	},
+    updateURL: {
+        label: "Encode secretkeys in current url hash",
+        type: "checkbox",
+        default: true,
+        afterChange: (value) => {
+            if (value) {
+                updateURL();
+            } else {
+                history.replaceState(null, "", window.location.origin + window.location.pathname + window.location.search);
+            }
+        }
+    },
+};
 
-		offlineMode = this.checked;
-		localStorage.setItem('offlineMode', offlineMode);
-
-		if (navigator.serviceWorker.controller) {
-			navigator.serviceWorker.controller.postMessage({
-				type: 'SET_OFFLINE_MODE',
-				value: offlineMode
-			});
-		}
-	});
-});
+for (let key in settings) {
+    config.defaults[key] = settings[key].default;
+}
+config.load();
 
 // ================================
 // localStorage management
@@ -588,6 +549,89 @@ async function openManagesecretKeysModal() {
     await updateDecryptionForKeys();
     rendersecretKeysTable();
   });
+}
+
+function renderSettings() {
+    const container = document.getElementById('settingsContainer');
+    container.innerHTML = '';
+
+    Object.entries(settings).forEach(([key, def]) => {
+        const item = document.createElement('div');
+        item.className = 'setting-item';
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.justifyContent = 'space-between';
+        item.style.marginBottom = '1em';
+
+        const label = document.createElement('label');
+        label.textContent = def.label;
+
+        let input;
+        if (def.type === 'checkbox') {
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = config.get(key) ?? def.default;
+
+            input.addEventListener('change', async () => {
+                const value = input.checked;
+                if (def.onChange) {
+                    const res = await def.onChange(value, input);
+                    if (res === false) {
+                        input.checked = config.get(key) ?? def.default;
+                        return;
+                    }
+                }
+
+                config.set(key, value);
+                if (def.afterChange) {
+                    await def.afterChange(value, input);
+                }
+            });
+
+            const switchLabel = document.createElement('label');
+            switchLabel.className = 'switch';
+            const span = document.createElement('span');
+            span.className = 'slider round';
+            switchLabel.appendChild(input);
+            switchLabel.appendChild(span);
+            item.appendChild(label);
+            item.appendChild(switchLabel);
+        } else {
+            input = document.createElement('input');
+            input.type = def.type;
+            input.value = config.get(key) ?? def.default;
+
+            input.addEventListener('change', async () => {
+                let value;
+                if (def.type === 'number') value = Number(input.value);
+                else value = input.value;
+
+                if (def.onChange) {
+                    const res = await def.onChange(value, input);
+                    if (res === false) {
+                        input.value = config.get(key) ?? def.default;
+                        return;
+                    }
+                }
+
+                config.set(key, value);
+
+                if (def.afterChange) {
+                    await def.afterChange(value, input);
+                }
+            });
+
+            item.appendChild(label);
+            item.appendChild(input);
+        }
+
+        container.appendChild(item);
+    });
+}
+
+function openSettingsModal() {
+    renderSettings();
+    document.getElementById("settingsModal").style.display = "flex";
 }
 
 function renderMasterKeysTable() {
@@ -985,7 +1029,7 @@ function startCamera() {
       video.play();
       requestAnimationFrame(scanQRCode);
     })
-    .catch(err => console.error(err));
+    .catch(err => console.warn(err));
 }
 
 function stopCamera() {
@@ -1054,7 +1098,7 @@ function parseQRCodeFromText(qrText) {
 
   const prefix = 'otpauth://totp/';
   if (!qrText.startsWith(prefix)) {
-    console.log('QR text does not start with expected prefix.');
+    console.warn('QR text does not start with expected prefix. Full text:', qrText);
     alert('Invalid QR code format.');
     return;
   }
@@ -1063,7 +1107,7 @@ function parseQRCodeFromText(qrText) {
   const remainingText = decodedQRText.slice(prefix.length);
   const parts = remainingText.split('?secret=');
   if (parts.length !== 2) {
-    console.log('Could not find secret part in QR code.');
+    console.warn('Could not find secret part in QR code. Full remaining text:', remainingText);
     alert('Invalid QR code format: Missing "secret=".');
     return;
   }

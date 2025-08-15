@@ -1,4 +1,9 @@
 let offlineMode = true;
+const swPrefix = '[ServiceWorker]';
+['log','warn','error'].forEach(fn => {
+    const orig = console[fn];
+    console[fn] = (...args) => orig(swPrefix, ...args);
+});
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -51,10 +56,10 @@ self.addEventListener('fetch', (event) => {
       if (offlineMode) {
         const cacheResponse = await caches.match(request);
         if (cacheResponse) {
-          console.log(`[Cache][offlineMode] Served from cache: ${request.url}`);
+          console.log(`Served from cache: ${request.url}`);
           return cacheResponse;
         }
-        console.warn(`[Cache][offlineMode] No cache for: ${request.url}, returning 503`);
+        console.warn(`No cache for: ${request.url}, returning 503`);
         return new Response('Offline mode: no cached data', {
           status: 503,
           statusText: 'Service Unavailable',
@@ -72,18 +77,18 @@ self.addEventListener('fetch', (event) => {
             cache.put(request, clonedResponse).catch((cacheError) => {
               console.error('Error while saving to cache:', cacheError);
             });
-            console.log(`[Network] Fetched and cached: ${request.url}`);
+            console.log(`Fetched and cached: ${request.url}`);
           } else {
-            console.log(`[Network] Not cached due to protocol or method: ${request.url}`);
+            console.log(`Not cached due to protocol or method: ${request.url}`);
           }
           return response;
         } catch {
           const cacheResponse = await caches.match(request);
           if (cacheResponse) {
-            console.log(`[Cache] Served from cache after network failure: ${request.url}`);
+            console.log(`Served from cache after network failure: ${request.url}`);
             return cacheResponse;
           }
-          console.warn(`[Error] No cache for: ${request.url}`);
+          console.warn(`No cache for: ${request.url}`);
           return new Response('Error loading and no data in cache', {
             status: 500,
             statusText: 'Internal Server Error',

@@ -16,24 +16,31 @@ if (location.origin !== "null" && location.protocol !== "file:") {
 // ================================
 
 function updateURL() {
-  const data = JSON.stringify(keys);
-  const base64Data = base64EncodeUnicode(data);
-  const newURL =
-    window.location.origin +
-    window.location.pathname +
-    "#keys=" +
-    base64Data;
-  history.replaceState(null, "", newURL);
+    if (!config.get("updateURL")) return;
+
+    if (!keys || keys.length === 0) {
+        history.replaceState(null, "", window.location.origin + window.location.pathname);
+        return;
+    }
+
+    const data = JSON.stringify(keys);
+    const base64Data = base64EncodeUnicode(data);
+    const newURL =
+        window.location.origin +
+        window.location.pathname +
+        "#keys=" +
+        base64Data;
+    history.replaceState(null, "", newURL);
 }
 
 function getKeysFromURL() {
   if (window.location.hash.startsWith("#keys=")) {
     try {
-return JSON.parse(
-  base64DecodeUnicode(window.location.hash.substring(6))
-);
+      return JSON.parse(
+        base64DecodeUnicode(window.location.hash.substring(6))
+      );
     } catch (e) {
-console.error("Error reading keys from URL:", e);
+      console.error("Error reading keys from URL. e:", e, "Full URL:", window.location.href);
     }
   }
   return null;
@@ -75,7 +82,7 @@ function customPrompt(text, isPassword = 0, noEscape = 0) {
     promptText.innerText = text;
     promptInput.value = "";
 
-    if (PasswordHideOn === 0) {
+    if (config.get('passwordHideOn') === false) {
       promptInput.type = "text";
     } else {
       promptInput.type = isPassword ? "password" : "text";
@@ -136,3 +143,70 @@ document.getElementById('customPromptInput').addEventListener('input', function(
   document.getElementById('customPromptOk').disabled = !this.value.trim();
 });
 
+// ================================
+// Config
+// ================================
+
+const config = {
+    key: 'config',
+    values: {},
+    defaults: {},
+
+    load() {
+        try {
+            const stored = localStorage.getItem(this.key);
+            if (stored) {
+                this.values = JSON.parse(stored);
+            }
+        } catch (e) {
+            console.error("Error loading config:", e);
+            this.values = {};
+        }
+
+        for (let key in this.defaults) {
+            if (!(key in this.values)) {
+                this.values[key] = this.defaults[key];
+            }
+        }
+    },
+
+    save() {
+        try {
+            localStorage.setItem(this.key, JSON.stringify(this.values));
+        } catch (e) {
+            console.error("Error saving config:", e);
+        }
+    },
+
+    set(key, value) {
+        this.values[key] = value;
+        this.save();
+    },
+
+    get(key) {
+        return this.values[key];
+    },
+
+    reset(key) {
+        if (key in this.defaults) {
+            this.values[key] = this.defaults[key];
+            this.save();
+        }
+    },
+
+    exportstr() {
+        return JSON.stringify(this.values);
+    },
+
+    importstr(str) {
+        try {
+            const obj = JSON.parse(str);
+            if (typeof obj === 'object' && obj !== null) {
+                this.values = obj;
+                this.save();
+            }
+        } catch (e) {
+            console.error("[Config] Invalid import string", e);
+        }
+    }
+};
