@@ -217,8 +217,8 @@ function saveKeys() {
 }
 
 async function loadMasterKeys() {
-  const storedEncHash = localStorage.getItem("masterKeysEncKeyHash");
-  if (storedEncHash) {
+  const encryptedMasterKeys = localStorage.getItem("masterKeys");
+  if (encryptedMasterKeys) {
     let validKey = false;
     while (!validKey) {
       sessionEncKey = await prompt(
@@ -228,29 +228,21 @@ async function loadMasterKeys() {
       );
       if (sessionEncKey === "CLEAR MASTERKEYS") {
         localStorage.removeItem("masterKeys");
-        localStorage.removeItem("masterKeysEncKeyHash");
         masterKeys = [];
         sessionEncKey = null;
         break;
       }
-      const hashOfSessionKey = await sha256(sessionEncKey);
-      if (hashOfSessionKey !== storedEncHash) {
-        continue;
-      } else {
+
+      try {
+        const decryptedJSON = await decryptText(encryptedMasterKeys, sessionEncKey);
+        masterKeys = JSON.parse(decryptedJSON);
         validKey = true;
-        const encryptedMasterKeys = localStorage.getItem("masterKeys");
-        try {
-          const decryptedJSON = await decryptText(encryptedMasterKeys, sessionEncKey);
-          masterKeys = JSON.parse(decryptedJSON);
-        } catch (e) {
-          alert("Error decrypting master keys: " + e.message);
-          masterKeys = [];
-        }
+      } catch (e) {
+        alert("Incorrect key or corrupted data. Try again.");
       }
     }
   } else {
-    const stored = localStorage.getItem("masterKeys");
-    masterKeys = stored ? JSON.parse(stored) : [];
+    masterKeys = [];
   }
   updateURL();
   updateEncButton();
@@ -262,14 +254,11 @@ async function saveMasterKeys() {
     try {
       const encrypted = await encryptText(jsonData, sessionEncKey);
       localStorage.setItem("masterKeys", encrypted);
-      const hashOfSessionKey = await sha256(sessionEncKey);
-      localStorage.setItem("masterKeysEncKeyHash", hashOfSessionKey);
     } catch (e) {
       alert("Error encrypting master keys: " + e.message);
     }
   } else {
     localStorage.setItem("masterKeys", JSON.stringify(masterKeys));
-    localStorage.removeItem("masterKeysEncKeyHash");
   }
   updateURL();
 }
