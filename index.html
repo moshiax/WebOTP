@@ -221,27 +221,44 @@ function saveKeys() {
 }
 
 async function loadMasterKeys() {
-	const encryptedMasterKeys = localStorage.getItem("masterKeys");
-	if (encryptedMasterKeys) {
-		let validKey = false;
-		while (!validKey) {
-			sessionEncKey = await prompt("Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)", 1, 1);
-			if (sessionEncKey === "CLEAR MASTERKEYS") {
-				localStorage.removeItem("masterKeys");
-				masterKeys = [];
-				sessionEncKey = null;
-				break;
+	const stored = localStorage.getItem("masterKeys");
+	if (!stored) return void (masterKeys = [], sessionEncKey = null, updateURL(), updateEncButton());
+
+	try {
+		const parsed = JSON.parse(stored);
+
+		if (Array.isArray(parsed)) {
+			masterKeys = parsed;
+			sessionEncKey = null;
+		} else if (parsed?.data && parsed?.iv && parsed?.salt) {
+			let valid = false;
+			while (!valid) {
+				sessionEncKey = await prompt(
+					"Enter master keys encryption key (or type 'CLEAR MASTERKEYS' to clear)",
+					1, 1
+				);
+				if (sessionEncKey === "CLEAR MASTERKEYS") {
+					localStorage.removeItem("masterKeys");
+					masterKeys = [];
+					sessionEncKey = null;
+					break;
+				}
+				try {
+					masterKeys = JSON.parse(await decryptText(stored, sessionEncKey));
+					valid = true;
+				} catch {
+					alert("Incorrect key or corrupted data. Try again.");
+				}
 			}
-			try {
-				const decryptedJSON = await decryptText(encryptedMasterKeys, sessionEncKey);
-				masterKeys = JSON.parse(decryptedJSON);
-				validKey = true;
-			} catch (e) {
-				alert("Incorrect key or corrupted data. Try again.");
-			}
+		} else {
+			console.warn("Unknown masterKeys format");
+			masterKeys = [];
+			sessionEncKey = null;
 		}
-	} else {
+	} catch {
+		console.error("Failed to parse masterKeys");
 		masterKeys = [];
+		sessionEncKey = null;
 	}
 	updateURL();
 	updateEncButton();
