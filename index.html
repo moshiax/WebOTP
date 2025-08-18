@@ -132,42 +132,42 @@
 <script src="external/protobuf.js"></script>
 <script>
 const settings = {
-    passwordHideOn: {
-        label: "Hide Password Input",
-        type: "checkbox",
-        default: !/mobile/i.test(navigator.userAgent),
-    },
+	passwordHideOn: {
+		label: "Hide Password Input",
+		type: "checkbox",
+		default: !/mobile/i.test(navigator.userAgent),
+	},
 	offlineMode: {
 		label: "Offline Mode",
 		type: "checkbox",
 		default: true,
 		onChange: async (value) => {
 			if (!value && window.location.protocol !== 'file:') {
-				const confirmDisable = await customPrompt(
-					'Warning! Disabling offline mode can expose your data to arbitrary code if hosted externally and the environment compromised. Type "yes" to confirm.',
-					0, 0
-				);
+				const confirmDisable = await customPrompt('Warning! Disabling offline mode can expose your data to arbitrary code if hosted externally and the environment compromised. Type "yes" to confirm.', 0, 0);
 				if (confirmDisable?.trim().toLowerCase() !== 'yes') return false;
 			}
-			navigator.serviceWorker?.controller?.postMessage({ type: 'SET_OFFLINE_MODE', value });
+			navigator.serviceWorker?.controller?.postMessage({
+				type: 'SET_OFFLINE_MODE',
+				value
+			});
 		}
 	},
-    updateURL: {
-        label: "Encode secretkeys in current url hash",
-        type: "checkbox",
-        default: true,
-        afterChange: (value) => {
-            if (value) {
-                updateURL();
-            } else {
-                history.replaceState(null, "", window.location.origin + window.location.pathname + window.location.search);
-            }
-        }
-    },
+	updateURL: {
+		label: "Encode secretkeys in current url hash",
+		type: "checkbox",
+		default: true,
+		afterChange: (value) => {
+			if (value) {
+				updateURL();
+			} else {
+				history.replaceState(null, "", window.location.origin + window.location.pathname + window.location.search);
+			}
+		}
+	},
 };
 
 for (let key in settings) {
-    config.defaults[key] = settings[key].default;
+	config.defaults[key] = settings[key].default;
 }
 config.load();
 
@@ -181,123 +181,116 @@ let sessionEncKey = null;
 let secretKeysRevealed = false;
 
 function loadKeys() {
-  let fromUrl = getKeysFromURL();
-  const stored = localStorage.getItem("authKeys");
-  if (stored) {
-    keys = JSON.parse(stored);
-    keys.forEach(key => {
-      delete key.decryptedSecret;
-      delete key.status;
-    });
-    if (fromUrl) {
-      mergeKeys(fromUrl);
-    }
-  } else if (fromUrl) {
-    keys = fromUrl;
-    localStorage.setItem("authKeys", JSON.stringify(keys));
-  } else {
-    keys = [];
-  }
-  updateURL();
+	let fromUrl = getKeysFromURL();
+	const stored = localStorage.getItem("authKeys");
+	if (stored) {
+		keys = JSON.parse(stored);
+		keys.forEach(key => {
+			delete key.decryptedSecret;
+			delete key.status;
+		});
+		if (fromUrl) {
+			mergeKeys(fromUrl);
+		}
+	} else if (fromUrl) {
+		keys = fromUrl;
+		localStorage.setItem("authKeys", JSON.stringify(keys));
+	} else {
+		keys = [];
+	}
+	updateURL();
 }
 
 function mergeKeys(fromUrl) {
-  for (const keyObj of fromUrl) {
-    if (!keys.find((k) => k.id === keyObj.id)) {
-      keys.push(keyObj);
-    }
-  }
-  localStorage.setItem("authKeys", JSON.stringify(keys));
+	for (const keyObj of fromUrl) {
+		if (!keys.find((k) => k.id === keyObj.id)) {
+			keys.push(keyObj);
+		}
+	}
+	localStorage.setItem("authKeys", JSON.stringify(keys));
 }
 
 function saveKeys() {
-  const keysToStore = keys.map(({ decryptedSecret, status, ...rest }) => rest);
-  localStorage.setItem("authKeys", JSON.stringify(keysToStore));
-  updateURL();
+	const keysToStore = keys.map(({
+		decryptedSecret,
+		status,
+		...rest
+	}) => rest);
+	localStorage.setItem("authKeys", JSON.stringify(keysToStore));
+	updateURL();
 }
 
 async function loadMasterKeys() {
-  const encryptedMasterKeys = localStorage.getItem("masterKeys");
-  if (encryptedMasterKeys) {
-    let validKey = false;
-    while (!validKey) {
-      sessionEncKey = await prompt(
-        "Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)",
-		1,
-		1
-      );
-      if (sessionEncKey === "CLEAR MASTERKEYS") {
-        localStorage.removeItem("masterKeys");
-        masterKeys = [];
-        sessionEncKey = null;
-        break;
-      }
-
-      try {
-        const decryptedJSON = await decryptText(encryptedMasterKeys, sessionEncKey);
-        masterKeys = JSON.parse(decryptedJSON);
-        validKey = true;
-      } catch (e) {
-        alert("Incorrect key or corrupted data. Try again.");
-      }
-    }
-  } else {
-    masterKeys = [];
-  }
-  updateURL();
-  updateEncButton();
+	const encryptedMasterKeys = localStorage.getItem("masterKeys");
+	if (encryptedMasterKeys) {
+		let validKey = false;
+		while (!validKey) {
+			sessionEncKey = await prompt("Enter the master keys encryption key for decryption:\n(or type 'CLEAR MASTERKEYS' to clear masterkeys)", 1, 1);
+			if (sessionEncKey === "CLEAR MASTERKEYS") {
+				localStorage.removeItem("masterKeys");
+				masterKeys = [];
+				sessionEncKey = null;
+				break;
+			}
+			try {
+				const decryptedJSON = await decryptText(encryptedMasterKeys, sessionEncKey);
+				masterKeys = JSON.parse(decryptedJSON);
+				validKey = true;
+			} catch (e) {
+				alert("Incorrect key or corrupted data. Try again.");
+			}
+		}
+	} else {
+		masterKeys = [];
+	}
+	updateURL();
+	updateEncButton();
 }
 
 async function saveMasterKeys() {
-  if (sessionEncKey) {
-    const jsonData = JSON.stringify(masterKeys);
-    try {
-      const encrypted = await encryptText(jsonData, sessionEncKey);
-      localStorage.setItem("masterKeys", encrypted);
-    } catch (e) {
-      alert("Error encrypting master keys: " + e.message);
-    }
-  } else {
-    localStorage.setItem("masterKeys", JSON.stringify(masterKeys));
-  }
-  updateURL();
+	if (sessionEncKey) {
+		const jsonData = JSON.stringify(masterKeys);
+		try {
+			const encrypted = await encryptText(jsonData, sessionEncKey);
+			localStorage.setItem("masterKeys", encrypted);
+		} catch (e) {
+			alert("Error encrypting master keys: " + e.message);
+		}
+	} else {
+		localStorage.setItem("masterKeys", JSON.stringify(masterKeys));
+	}
+	updateURL();
 }
 
 async function changeMasterKeysEncryptionKey() {
-  const newKey = await prompt("Enter a new key for encrypting master keys:", 1);
-  if (!newKey) return;
-  sessionEncKey = newKey;
-  await saveMasterKeys();
-  alert("Master keys encryption key successfully changed.");
-  updateEncButton();
-  updateMasterEncryptionControls();
+	const newKey = await prompt("Enter a new key for encrypting master keys:", 1);
+	if (!newKey) return;
+	sessionEncKey = newKey;
+	await saveMasterKeys();
+	alert("Master keys encryption key successfully changed.");
+	updateEncButton();
+	updateMasterEncryptionControls();
 }
-
 async function enableMasterKeysEncryption() {
-  const newKey = await prompt("Enter the key to encrypt master keys:", 1);
-  if (!newKey) return;
-  sessionEncKey = newKey;
-  await saveMasterKeys();
-  alert("Master keys are now encrypted.");
-  updateEncButton();
-  updateMasterEncryptionControls();
+	const newKey = await prompt("Enter the key to encrypt master keys:", 1);
+	if (!newKey) return;
+	sessionEncKey = newKey;
+	await saveMasterKeys();
+	alert("Master keys are now encrypted.");
+	updateEncButton();
+	updateMasterEncryptionControls();
 }
-
 async function disableMasterKeysEncryption() {
-  if (
-    !confirm(
-      "Are you sure you want to disable encryption of master keys? They will be stored in plaintext."
-    )
-  ) {
-    return;
-  }
-  const decryptedKeys = masterKeys;
-  sessionEncKey = null;
-  masterKeys = decryptedKeys;
-  await saveMasterKeys();
-  alert("Encryption of master keys disabled.");
-  updateEncButton();
-  updateMasterEncryptionControls();
+	if (!confirm("Are you sure you want to disable encryption of master keys? They will be stored in plaintext.")) {
+		return;
+	}
+	const decryptedKeys = masterKeys;
+	sessionEncKey = null;
+	masterKeys = decryptedKeys;
+	await saveMasterKeys();
+	alert("Encryption of master keys disabled.");
+	updateEncButton();
+	updateMasterEncryptionControls();
 }
 
 // ================================
@@ -305,462 +298,402 @@ async function disableMasterKeysEncryption() {
 // ================================
 
 function updateEncButton() {
-  const controlsDiv = document.getElementById("encControls");
-  controlsDiv.innerHTML = "";
-  const button = document.createElement("button");
-  if (sessionEncKey) {
-    button.style.display = "none";
-  } else {
-    button.textContent = "Master keys unencrypted!";
-    button.style.backgroundColor = "#d73a49";
-  }
-  button.addEventListener("click", openManageMasterModal);
-  controlsDiv.appendChild(button);
+	const controlsDiv = document.getElementById("encControls");
+	controlsDiv.innerHTML = "";
+	const button = document.createElement("button");
+	if (sessionEncKey) {
+		button.style.display = "none";
+	} else {
+		button.textContent = "Master keys unencrypted!";
+		button.style.backgroundColor = "#d73a49";
+	}
+	button.addEventListener("click", openManageMasterModal);
+	controlsDiv.appendChild(button);
 }
 
 function updateMasterEncryptionControls() {
-  const container = document.getElementById("masterEncryptionControls");
-  container.innerHTML = "";
-  if (sessionEncKey) {
-    const changeBtn = document.createElement("button");
-    changeBtn.textContent = "Change encryption key";
-    changeBtn.addEventListener("click", changeMasterKeysEncryptionKey);
-    container.appendChild(changeBtn);
-    const disableBtn = document.createElement("button");
-    disableBtn.textContent = "Disable encryption";
-    disableBtn.addEventListener("click", disableMasterKeysEncryption);
-    container.appendChild(disableBtn);
-  } else {
-    const enableBtn = document.createElement("button");
-    enableBtn.textContent = "Enable master keys encryption";
-    enableBtn.addEventListener("click", enableMasterKeysEncryption);
-    container.appendChild(enableBtn);
-  }
+	const container = document.getElementById("masterEncryptionControls");
+	container.innerHTML = "";
+	if (sessionEncKey) {
+		const changeBtn = document.createElement("button");
+		changeBtn.textContent = "Change encryption key";
+		changeBtn.addEventListener("click", changeMasterKeysEncryptionKey);
+		container.appendChild(changeBtn);
+		const disableBtn = document.createElement("button");
+		disableBtn.textContent = "Disable encryption";
+		disableBtn.addEventListener("click", disableMasterKeysEncryption);
+		container.appendChild(disableBtn);
+	} else {
+		const enableBtn = document.createElement("button");
+		enableBtn.textContent = "Enable master keys encryption";
+		enableBtn.addEventListener("click", enableMasterKeysEncryption);
+		container.appendChild(enableBtn);
+	}
 }
 
 function deleteKey(keyObj) {
-  if (confirm("Are you sure you want to delete this key?")) {
-    keys = keys.filter((k) => k.id !== keyObj.id);
-    saveKeys();
-
-    const cardToDelete = document.getElementById("key-" + keyObj.id);
-    if (cardToDelete) {
-      cardToDelete.remove();
-    }
-
-    if (document.getElementById("managesecretKeysModal").style.display !== "none") {
-      rendersecretKeysTable();
-    }
-  }
+	if (confirm("Are you sure you want to delete this key?")) {
+		keys = keys.filter((k) => k.id !== keyObj.id);
+		saveKeys();
+		const cardToDelete = document.getElementById("key-" + keyObj.id);
+		if (cardToDelete) {
+			cardToDelete.remove();
+		}
+		if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+			rendersecretKeysTable();
+		}
+	}
 }
+const keyCardTemplate = `
+	<div class="key-card">
+		<button class="delete-btn" title="Delete this key">&times;</button>
+		<div class="public-values">
+			<div class="title">
+				<strong>Name:</strong>
+				<span class="editable-title" data-key-id="" contenteditable="true" spellcheck="false"></span>
+			</div>
+			<div class="otp">
+				<strong>OTP:</strong>
+				<span class="otp-value" style="cursor:pointer;">N/A</span>
+			</div>
+			<div class="status-wrapper">
+				<div class="status-container">
+					<strong>Status:</strong>
+					<span class="status" data-key-id="">Unknown</span>
+				</div>
+				<div class="otp-progress-container">
+					<div class="progress-container">
+						<div class="progress-circle"></div>
+						<div class="progress-fill"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+`;
 
 function createKeyCard(keyObj) {
-  const card = document.createElement("div");
-  card.className = "key-card";
-  card.id = "key-" + keyObj.id;
-
-  const delBtn = document.createElement("button");
-  delBtn.className = "delete-btn";
-  delBtn.innerHTML = "&times;";
-  delBtn.title = "Delete this key";
-  delBtn.onclick = () => deleteKey(keyObj);
-  card.appendChild(delBtn);
-
-  const publicDiv = document.createElement("div");
-  publicDiv.className = "public-values";
-
-  const titleDiv = document.createElement("div");
-  titleDiv.className = "title";
-  titleDiv.innerHTML =
-    '<strong>Name:</strong> <span class="editable-title" data-key-id="' +
-    keyObj.id +
-    '" contenteditable="true" spellcheck="false">' +
-    keyObj.title +
-    "</span>";
-  publicDiv.appendChild(titleDiv);
-
-  const otpDiv = document.createElement("div");
-  otpDiv.className = "otp";
-  otpDiv.innerHTML = "<strong>OTP:</strong> ";
-
-  const otpSpan = document.createElement("span");
-  otpSpan.id = "otp-" + keyObj.id;
-  otpSpan.textContent = "N/A";
-  otpSpan.style.cursor = "pointer";
-
-  otpSpan.addEventListener("click", function () {
-    if (/^\d{6}$/.test(otpSpan.textContent)) {
-      navigator.clipboard.writeText(otpSpan.textContent).then(() => {
-        alert("OTP copied to clipboard!");
-      }).catch((e) => {
-        alert("Copy failed: " + e.message);
-      });
-    }
-  });
-
-  otpDiv.appendChild(otpSpan);
-  publicDiv.appendChild(otpDiv);
-
-  const statusWrapper = document.createElement("div");
-  statusWrapper.className = "status-wrapper";
-
-  const statusContainer = document.createElement("div");
-  statusContainer.className = "status-container";
-
-  const statusLabel = document.createElement("strong");
-  statusLabel.textContent = "Status:";
-
-  const statusSpan = document.createElement("span");
-  statusSpan.id = "status-" + keyObj.id;
-  statusSpan.className = "status";
-  statusSpan.textContent = "Unknown";
-  statusSpan.setAttribute("data-key-id", keyObj.id);
-  statusSpan.addEventListener("click", async function () {
-    const id = this.getAttribute("data-key-id");
-    const key = keys.find((k) => k.id === id);
-    if (!key) return;
-    const mk = getMatchingMasterKey(key);
-    if (mk) {
-      try {
-        const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
-        await navigator.clipboard.writeText(decryptedSecret);
-        alert("Secret copied to clipboard!");
-      } catch (e) {
-        alert("Copy failed: " + e.message);
-      }
-    }
-  });
-
-  statusContainer.appendChild(statusLabel);
-  statusContainer.appendChild(statusSpan);
-  statusWrapper.appendChild(statusContainer);
-
-  const progressContainer = document.createElement("div");
-  progressContainer.className = "otp-progress-container";
-  progressContainer.innerHTML = `
-    <div class="progress-container">
-      <div class="progress-circle"></div>
-      <div class="progress-fill" id="progress-${keyObj.id}"></div>
-    </div>
-  `;
-  statusWrapper.appendChild(progressContainer);
-
-  publicDiv.appendChild(statusWrapper);
-  card.appendChild(publicDiv);
-
-  const editableTitle = card.querySelector(".editable-title");
-  editableTitle.addEventListener("blur", function () {
-    const keyId = this.getAttribute("data-key-id");
-    const keyObj = keys.find((k) => k.id === keyId);
-    if (keyObj) {
-      const newTitle = this.textContent.trim();
-      if (newTitle && newTitle !== keyObj.title) {
-        keyObj.title = newTitle;
-        saveKeys();
-        this.textContent = newTitle;
-        if (document.getElementById("managesecretKeysModal").style.display !== "none") {
-          rendersecretKeysTable();
-        }
-      }
-    }
-  });
-
-  editableTitle.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      this.blur();
-    }
-  });
-
-  return card;
+	const template = document.createElement("template");
+	template.innerHTML = keyCardTemplate.trim();
+	const card = template.content.firstElementChild.cloneNode(true);
+	card.id = "key-" + keyObj.id;
+	// Delete button
+	const delBtn = card.querySelector(".delete-btn");
+	delBtn.onclick = () => deleteKey(keyObj);
+	// Editable title
+	const editableTitle = card.querySelector(".editable-title");
+	editableTitle.textContent = keyObj.title;
+	editableTitle.dataset.keyId = keyObj.id;
+	editableTitle.addEventListener("blur", function() {
+		const key = keys.find(k => k.id === this.dataset.keyId);
+		if (key) {
+			const newTitle = this.textContent.trim();
+			if (newTitle && newTitle !== key.title) {
+				key.title = newTitle;
+				saveKeys();
+				this.textContent = newTitle;
+				if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+					rendersecretKeysTable();
+				}
+			}
+		}
+	});
+	editableTitle.addEventListener("keydown", function(e) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			this.blur();
+		}
+	});
+	// OTP click copy
+	const otpSpan = card.querySelector(".otp-value");
+	otpSpan.id = "otp-" + keyObj.id;
+	otpSpan.addEventListener("click", function() {
+		if (/^\d{6}$/.test(this.textContent)) {
+			navigator.clipboard.writeText(this.textContent).then(() => alert("OTP copied!")).catch(e => alert("Copy failed: " + e.message));
+		}
+	});
+	// Status click to copy secret
+	const statusSpan = card.querySelector(".status");
+	statusSpan.id = "status-" + keyObj.id;
+	statusSpan.dataset.keyId = keyObj.id;
+	statusSpan.addEventListener("click", async function() {
+		const keyId = this.dataset.keyId;
+		const key = keys.find(k => k.id === keyId);
+		if (!key) return;
+		const mk = getMatchingMasterKey(key);
+		if (!mk) return;
+		try {
+			const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
+			await navigator.clipboard.writeText(decryptedSecret);
+			alert("Secret copied to clipboard!");
+		} catch (e) {
+			alert("Copy failed: " + e.message);
+		}
+	});
+	// Progress bar reference
+	const progressFill = card.querySelector(".progress-fill");
+	progressFill.id = "progress-" + keyObj.id;
+	return card;
 }
 
 function renderKeys() {
-  const container = document.getElementById("keysContainer");
-  container.innerHTML = "";
-  keys.forEach((keyObj) => {
-    const card = createKeyCard(keyObj);
-    container.appendChild(card);
-  });
+	const container = document.getElementById("keysContainer");
+	container.innerHTML = "";
+	keys.forEach((keyObj) => {
+		const card = createKeyCard(keyObj);
+		container.appendChild(card);
+	});
 }
 
 function appendKeyCard(keyObj) {
-  const container = document.getElementById("keysContainer");
-  const keyCard = createKeyCard(keyObj);
-  container.appendChild(keyCard);
+	const container = document.getElementById("keysContainer");
+	const keyCard = createKeyCard(keyObj);
+	container.appendChild(keyCard);
 }
 
 function attachEditableTitleListenerToCard(cardElement) {
-  const titleElem = cardElement.querySelector(".editable-title");
-  if (!titleElem) return;
-  titleElem.addEventListener("blur", function () {
-    const keyId = this.getAttribute("data-key-id");
-    const keyObj = keys.find((k) => k.id === keyId);
-    if (keyObj) {
-      const newTitle = this.textContent.trim();
-      if (newTitle && newTitle !== keyObj.title) {
-        keyObj.title = newTitle;
-        saveKeys();
-        if (document.getElementById("managesecretKeysModal").style.display !== "none") {
-          rendersecretKeysTable();
-        }
-      }
-    }
-  });
-  titleElem.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      this.blur();
-    }
-  });
+	const titleElem = cardElement.querySelector(".editable-title");
+	if (!titleElem) return;
+	titleElem.addEventListener("blur", function() {
+		const keyId = this.getAttribute("data-key-id");
+		const keyObj = keys.find((k) => k.id === keyId);
+		if (keyObj) {
+			const newTitle = this.textContent.trim();
+			if (newTitle && newTitle !== keyObj.title) {
+				keyObj.title = newTitle;
+				saveKeys();
+				if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+					rendersecretKeysTable();
+				}
+			}
+		}
+	});
+	titleElem.addEventListener("keydown", function(e) {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			this.blur();
+		}
+	});
 }
 
 function openModal(modalId, updateFunction) {
-  if (updateFunction) {
-    updateFunction();
-  }
-  document.getElementById(modalId).style.display = "flex";
+	if (updateFunction) {
+		updateFunction();
+	}
+	document.getElementById(modalId).style.display = "flex";
 }
 
 function closeModal(modalId) {
-  document.getElementById(modalId).style.display = "none";
+	document.getElementById(modalId).style.display = "none";
 }
 
 async function openManageMasterModal() {
-  openModal("manageMasterModal", () => {
-    renderMasterKeysTable();
-    updateMasterEncryptionControls();
-  });
+	openModal("manageMasterModal", () => {
+		renderMasterKeysTable();
+		updateMasterEncryptionControls();
+	});
 }
 
 async function openManagesecretKeysModal() {
-  openModal("managesecretKeysModal", async () => {
-    await updateDecryptionForKeys();
-    rendersecretKeysTable();
-  });
+	openModal("managesecretKeysModal", async () => {
+		await updateDecryptionForKeys();
+		rendersecretKeysTable();
+	});
 }
 
 function renderSettings() {
-    const container = document.getElementById('settingsContainer');
-    container.innerHTML = '';
-
-    Object.entries(settings).forEach(([key, def]) => {
-        const item = document.createElement('div');
-        item.className = 'setting-item';
-        item.style.display = 'flex';
-        item.style.alignItems = 'center';
-        item.style.justifyContent = 'space-between';
-        item.style.marginBottom = '1em';
-
-        const label = document.createElement('label');
-        label.textContent = def.label;
-
-        let input;
-        if (def.type === 'checkbox') {
-            input = document.createElement('input');
-            input.type = 'checkbox';
-            input.checked = config.get(key) ?? def.default;
-
-            input.addEventListener('change', async () => {
-                const value = input.checked;
-                if (def.onChange) {
-                    const res = await def.onChange(value, input);
-                    if (res === false) {
-                        input.checked = config.get(key) ?? def.default;
-                        return;
-                    }
-                }
-
-                config.set(key, value);
-                if (def.afterChange) {
-                    await def.afterChange(value, input);
-                }
-            });
-
-            const switchLabel = document.createElement('label');
-            switchLabel.className = 'switch';
-            const span = document.createElement('span');
-            span.className = 'slider round';
-            switchLabel.appendChild(input);
-            switchLabel.appendChild(span);
-            item.appendChild(label);
-            item.appendChild(switchLabel);
-        } else {
-            input = document.createElement('input');
-            input.type = def.type;
-            input.value = config.get(key) ?? def.default;
-
-            input.addEventListener('change', async () => {
-                let value;
-                if (def.type === 'number') value = Number(input.value);
-                else value = input.value;
-
-                if (def.onChange) {
-                    const res = await def.onChange(value, input);
-                    if (res === false) {
-                        input.value = config.get(key) ?? def.default;
-                        return;
-                    }
-                }
-
-                config.set(key, value);
-
-                if (def.afterChange) {
-                    await def.afterChange(value, input);
-                }
-            });
-
-            item.appendChild(label);
-            item.appendChild(input);
-        }
-
-        container.appendChild(item);
-    });
+	const container = document.getElementById('settingsContainer');
+	container.innerHTML = '';
+	Object.entries(settings).forEach(([key, def]) => {
+		const item = document.createElement('div');
+		item.className = 'setting-item';
+		item.style.display = 'flex';
+		item.style.alignItems = 'center';
+		item.style.justifyContent = 'space-between';
+		item.style.marginBottom = '1em';
+		const label = document.createElement('label');
+		label.textContent = def.label;
+		let input;
+		if (def.type === 'checkbox') {
+			input = document.createElement('input');
+			input.type = 'checkbox';
+			input.checked = config.get(key) ?? def.default;
+			input.addEventListener('change', async () => {
+				const value = input.checked;
+				if (def.onChange) {
+					const res = await def.onChange(value, input);
+					if (res === false) {
+						input.checked = config.get(key) ?? def.default;
+						return;
+					}
+				}
+				config.set(key, value);
+				if (def.afterChange) {
+					await def.afterChange(value, input);
+				}
+			});
+			const switchLabel = document.createElement('label');
+			switchLabel.className = 'switch';
+			const span = document.createElement('span');
+			span.className = 'slider round';
+			switchLabel.appendChild(input);
+			switchLabel.appendChild(span);
+			item.appendChild(label);
+			item.appendChild(switchLabel);
+		} else {
+			input = document.createElement('input');
+			input.type = def.type;
+			input.value = config.get(key) ?? def.default;
+			input.addEventListener('change', async () => {
+				let value;
+				if (def.type === 'number') value = Number(input.value);
+				else value = input.value;
+				if (def.onChange) {
+					const res = await def.onChange(value, input);
+					if (res === false) {
+						input.value = config.get(key) ?? def.default;
+						return;
+					}
+				}
+				config.set(key, value);
+				if (def.afterChange) {
+					await def.afterChange(value, input);
+				}
+			});
+			item.appendChild(label);
+			item.appendChild(input);
+		}
+		container.appendChild(item);
+	});
 }
 
 function openSettingsModal() {
-    renderSettings();
-    document.getElementById("settingsModal").style.display = "flex";
+	renderSettings();
+	document.getElementById("settingsModal").style.display = "flex";
 }
 
 function renderMasterKeysTable() {
-  const tbody = document.querySelector("#masterKeysTable tbody");
-  tbody.innerHTML = "";
-
-  masterKeys.forEach((mk) => {
-    const usageCount = keys.filter(
-      (keyObj) => keyObj.encryptionHash === mk.hash
-    ).length;
-    const tr = document.createElement("tr");
-
-    const tdMasterKey = document.createElement("td");
-    tdMasterKey.className = "master-key-cell";
-    tdMasterKey.textContent = masterKeysRevealed ? mk.password : "Click to copy key";
-    tdMasterKey.addEventListener("click", async function () {
-      try {
-        await navigator.clipboard.writeText(mk.password);
-        alert("Master key copied to clipboard!");
-      } catch (e) {
-        alert("Copy failed: " + e.message);
-      }
-    });
-    tr.appendChild(tdMasterKey);
-
-    const hashToDisplay =
-      window.innerWidth < 768 ? mk.hash.slice(0, 15) + "..." : mk.hash;
-    const tdHash = document.createElement("td");
-    tdHash.textContent = hashToDisplay;
-    tr.appendChild(tdHash);
-
-    const tdUsage = document.createElement("td");
-    tdUsage.textContent = usageCount;
-    tr.appendChild(tdUsage);
-
-    const tdActions = document.createElement("td");
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "Delete";
-    delBtn.onclick = function () {
-      if (confirm("Delete this master key?")) {
-        masterKeys = masterKeys.filter((key) => key.hash !== mk.hash);
-        saveMasterKeys();
-
-        tr.remove();
-
-        updateAffectedKeys(mk.hash);
-      }
-    };
-    tdActions.appendChild(delBtn);
-    tr.appendChild(tdActions);
-
-    tbody.appendChild(tr);
-  });
+	const tbody = document.querySelector("#masterKeysTable tbody");
+	tbody.innerHTML = "";
+	masterKeys.forEach((mk) => {
+		const usageCount = keys.filter(
+			(keyObj) => keyObj.encryptionHash === mk.hash).length;
+		const tr = document.createElement("tr");
+		const tdMasterKey = document.createElement("td");
+		tdMasterKey.className = "master-key-cell";
+		tdMasterKey.textContent = masterKeysRevealed ? mk.password : "Click to copy key";
+		tdMasterKey.addEventListener("click", async function() {
+			try {
+				await navigator.clipboard.writeText(mk.password);
+				alert("Master key copied to clipboard!");
+			} catch (e) {
+				alert("Copy failed: " + e.message);
+			}
+		});
+		tr.appendChild(tdMasterKey);
+		const hashToDisplay = window.innerWidth < 768 ? mk.hash.slice(0, 15) + "..." : mk.hash;
+		const tdHash = document.createElement("td");
+		tdHash.textContent = hashToDisplay;
+		tr.appendChild(tdHash);
+		const tdUsage = document.createElement("td");
+		tdUsage.textContent = usageCount;
+		tr.appendChild(tdUsage);
+		const tdActions = document.createElement("td");
+		const delBtn = document.createElement("button");
+		delBtn.textContent = "Delete";
+		delBtn.onclick = function() {
+			if (confirm("Delete this master key?")) {
+				masterKeys = masterKeys.filter((key) => key.hash !== mk.hash);
+				saveMasterKeys();
+				tr.remove();
+				updateAffectedKeys(mk.hash);
+			}
+		};
+		tdActions.appendChild(delBtn);
+		tr.appendChild(tdActions);
+		tbody.appendChild(tr);
+	});
 }
 
 function updateAffectedKeys(deletedHash) {
-  keys.forEach((keyObj) => {
-    if (keyObj.encryptionHash === deletedHash) {
-      keyObj.decryptedSecret = null;
-      const statusElement = document.getElementById(`status-${keyObj.id}`);
-      
-      if (statusElement) {
-        statusElement.textContent = "Encrypted";
-        statusElement.classList.add("status-encrypted");
-        statusElement.classList.remove("status-decrypted");
-      }
-    }
-  });
+	keys.forEach((keyObj) => {
+		if (keyObj.encryptionHash === deletedHash) {
+			keyObj.decryptedSecret = null;
+			const statusElement = document.getElementById(`status-${keyObj.id}`);
+			if (statusElement) {
+				statusElement.textContent = "Encrypted";
+				statusElement.classList.add("status-encrypted");
+				statusElement.classList.remove("status-decrypted");
+			}
+		}
+	});
 }
 
 function rendersecretKeysTable() {
-  const tbody = document.querySelector("#secretKeysTable tbody");
-  tbody.innerHTML = "";
-  keys.forEach((keyObj, idx) => {
-    const tr = document.createElement("tr");
-
-    const tdKey = document.createElement("td");
-    tdKey.className = "master-key-cell";
-    if (secretKeysRevealed) {
-      tdKey.textContent = keyObj.decryptedSecret || "Encrypted";
-    } else {
-      tdKey.textContent = "Click to copy key";
-    }
-    tdKey.addEventListener("click", async function () {
-      const mk = getMatchingMasterKey(keyObj);
-      if (!keyObj.decryptedSecret && mk) {
-        try {
-          keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
-          await navigator.clipboard.writeText(keyObj.decryptedSecret);
-          alert("Key copied to clipboard!");
-          rendersecretKeysTable();
-        } catch (e) {
-          alert("Decryption or copy failed: " + e.message);
-        }
-      } else if (keyObj.decryptedSecret) {
-        try {
-          await navigator.clipboard.writeText(keyObj.decryptedSecret);
-          alert("Key copied to clipboard!");
-        } catch (e) {
-          alert("Copy failed: " + e.message);
-        }
-      } else {
-        alert("Master key not available to decrypt this key.");
-      }
-    });
-    tr.appendChild(tdKey);
-
-    const tdHash = document.createElement("td");
-    const hashToDisplay =
-      window.innerWidth < 768 ? keyObj.encryptionHash.slice(0, 15) + "..." : keyObj.encryptionHash;
-    tdHash.textContent = hashToDisplay;
-    tr.appendChild(tdHash);
-
-    const tdActions = document.createElement("td");
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "Delete";
-    delBtn.onclick = function () {
-      deleteKey(keyObj);
-    };
-    tdActions.appendChild(delBtn);
-    tr.appendChild(tdActions);
-
-    tbody.appendChild(tr);
-  });
-  updatesecretKeysRevealButton();
+	const tbody = document.querySelector("#secretKeysTable tbody");
+	tbody.innerHTML = "";
+	keys.forEach((keyObj, idx) => {
+		const tr = document.createElement("tr");
+		const tdKey = document.createElement("td");
+		tdKey.className = "master-key-cell";
+		if (secretKeysRevealed) {
+			tdKey.textContent = keyObj.decryptedSecret || "Encrypted";
+		} else {
+			tdKey.textContent = "Click to copy key";
+		}
+		tdKey.addEventListener("click", async function() {
+			const mk = getMatchingMasterKey(keyObj);
+			if (!keyObj.decryptedSecret && mk) {
+				try {
+					keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
+					await navigator.clipboard.writeText(keyObj.decryptedSecret);
+					alert("Key copied to clipboard!");
+					rendersecretKeysTable();
+				} catch (e) {
+					alert("Decryption or copy failed: " + e.message);
+				}
+			} else if (keyObj.decryptedSecret) {
+				try {
+					await navigator.clipboard.writeText(keyObj.decryptedSecret);
+					alert("Key copied to clipboard!");
+				} catch (e) {
+					alert("Copy failed: " + e.message);
+				}
+			} else {
+				alert("Master key not available to decrypt this key.");
+			}
+		});
+		tr.appendChild(tdKey);
+		const tdHash = document.createElement("td");
+		const hashToDisplay = window.innerWidth < 768 ? keyObj.encryptionHash.slice(0, 15) + "..." : keyObj.encryptionHash;
+		tdHash.textContent = hashToDisplay;
+		tr.appendChild(tdHash);
+		const tdActions = document.createElement("td");
+		const delBtn = document.createElement("button");
+		delBtn.textContent = "Delete";
+		delBtn.onclick = function() {
+			deleteKey(keyObj);
+		};
+		tdActions.appendChild(delBtn);
+		tr.appendChild(tdActions);
+		tbody.appendChild(tr);
+	});
+	updatesecretKeysRevealButton();
 }
 
 function updatesecretKeysRevealButton() {
-  let btn = document.getElementById("toggleRevealsecretKeysBtn");
-  if (!btn) {
-    btn = document.createElement("button");
-    btn.id = "toggleRevealsecretKeysBtn";
-    document.querySelector("#managesecretKeysModalContent").appendChild(btn);
-  }
-  btn.onclick = function() {
-    secretKeysRevealed = !secretKeysRevealed;
-    this.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
-    rendersecretKeysTable();
-  };
-  btn.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
+	let btn = document.getElementById("toggleRevealsecretKeysBtn");
+	if (!btn) {
+		btn = document.createElement("button");
+		btn.id = "toggleRevealsecretKeysBtn";
+		document.querySelector("#managesecretKeysModalContent").appendChild(btn);
+	}
+	btn.onclick = function() {
+		secretKeysRevealed = !secretKeysRevealed;
+		this.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
+		rendersecretKeysTable();
+	};
+	btn.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
 }
 
 // ================================
@@ -768,62 +701,62 @@ function updatesecretKeysRevealButton() {
 // ================================
 
 function getMatchingMasterKey(keyObj) {
-  return masterKeys.find((mk) => mk.hash === keyObj.encryptionHash);
+	return masterKeys.find((mk) => mk.hash === keyObj.encryptionHash);
 }
 
 async function updateKeyCard(keyObj) {
-  const otpSpan = document.getElementById("otp-" + keyObj.id);
-  const statusSpan = document.getElementById("status-" + keyObj.id);
-  const mk = getMatchingMasterKey(keyObj);
-  if (mk) {
-    try {
-      const decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
-      const otp = await generateOTP(decryptedSecret);
-      otpSpan.textContent = otp;
-      statusSpan.textContent = "Decrypted";
-      statusSpan.className = "status status-decrypted";
-    } catch (_) {
-      otpSpan.textContent = "N/A";
-      statusSpan.textContent = "Decryption error";
-      statusSpan.className = "status status-failed";
-    }
-  } else {
-    otpSpan.textContent = "N/A";
-    statusSpan.textContent = "Encrypted";
-    statusSpan.className = "status status-encrypted";
-  }
+	const otpSpan = document.getElementById("otp-" + keyObj.id);
+	const statusSpan = document.getElementById("status-" + keyObj.id);
+	const mk = getMatchingMasterKey(keyObj);
+	if (mk) {
+		try {
+			const decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
+			const otp = await generateOTP(decryptedSecret);
+			otpSpan.textContent = otp;
+			statusSpan.textContent = "Decrypted";
+			statusSpan.className = "status status-decrypted";
+		} catch (_) {
+			otpSpan.textContent = "N/A";
+			statusSpan.textContent = "Decryption error";
+			statusSpan.className = "status status-failed";
+		}
+	} else {
+		otpSpan.textContent = "N/A";
+		statusSpan.textContent = "Encrypted";
+		statusSpan.className = "status status-encrypted";
+	}
 }
 
 async function updateAllKeyCards() {
-  keys.forEach((keyObj) => updateKeyCard(keyObj));
+	keys.forEach((keyObj) => updateKeyCard(keyObj));
 }
 
 async function updateDecryptionForKeys() {
-  if (masterKeys.length === 0) {
-    keys.forEach((keyObj) => (keyObj.status = "encrypted"));
-    return;
-  }
-  for (const keyObj of keys) {
-    const mk = getMatchingMasterKey(keyObj);
-    if (mk) {
-      if (keyObj.decryptedSecret) {
-        keyObj.status = "decrypted";
-      } else {
-        keyObj.status = await decryptKey(keyObj, mk);
-      }
-    } else {
-      keyObj.status = "encrypted";
-    }
-  }
+	if (masterKeys.length === 0) {
+		keys.forEach((keyObj) => (keyObj.status = "encrypted"));
+		return;
+	}
+	for (const keyObj of keys) {
+		const mk = getMatchingMasterKey(keyObj);
+		if (mk) {
+			if (keyObj.decryptedSecret) {
+				keyObj.status = "decrypted";
+			} else {
+				keyObj.status = await decryptKey(keyObj, mk);
+			}
+		} else {
+			keyObj.status = "encrypted";
+		}
+	}
 }
 
 async function decryptKey(keyObj, mk) {
-  try {
-    keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
-    return "decrypted";
-  } catch {
-    return "failed";
-  }
+	try {
+		keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
+		return "decrypted";
+	} catch {
+		return "failed";
+	}
 }
 
 // ================================
@@ -831,100 +764,105 @@ async function decryptKey(keyObj, mk) {
 // ================================
 
 async function exportData(toFile = false) {
-  const combined = JSON.stringify({ keys, masterKeys });
-  const password = await prompt("Enter password for exporting data:", 1);
-  if (!password) return;
-  try {
-    const encrypted = await encryptText(combined, password);
-    if (toFile) {
-      const now = new Date();
-      const timestamp = now.toISOString().replace(/[:.]/g, "-");
-      const filename = `${timestamp}.keystore`;
-      const blob = new Blob([encrypted], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      alert("Data exported to file: " + filename);
-    } else {
-      try {
-        await navigator.clipboard.writeText(encrypted);
-        alert("Data successfully exported and copied to clipboard!");
-      } catch {
-        showCopyModal(encrypted);
-      }
-    }
-  } catch (e) {
-    alert("Error exporting data: " + e.message);
-  }
+	const combined = JSON.stringify({
+		keys,
+		masterKeys
+	});
+	const password = await prompt("Enter password for exporting data:", 1);
+	if (!password) return;
+	try {
+		const encrypted = await encryptText(combined, password);
+		if (toFile) {
+			const now = new Date();
+			const timestamp = now.toISOString().replace(/[:.]/g, "-");
+			const filename = `${timestamp}.keystore`;
+			const blob = new Blob([encrypted], {
+				type: "text/plain"
+			});
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = filename;
+			a.click();
+			URL.revokeObjectURL(url);
+			alert("Data exported to file: " + filename);
+		} else {
+			try {
+				await navigator.clipboard.writeText(encrypted);
+				alert("Data successfully exported and copied to clipboard!");
+			} catch {
+				showCopyModal(encrypted);
+			}
+		}
+	} catch (e) {
+		alert("Error exporting data: " + e.message);
+	}
 }
 
 async function importData(fromFile = false) {
-  let input;
-  if (fromFile) {
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".keystore";
-    fileInput.onchange = async (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        await processImport(reader.result);
-      };
-      reader.readAsText(file);
-    };
-    fileInput.click();
-  } else {
-    input = await prompt("Paste the string to import data:");
-    if (input) await processImport(input.trim());
-  }
+	let input;
+	if (fromFile) {
+		const fileInput = document.createElement("input");
+		fileInput.type = "file";
+		fileInput.accept = ".keystore";
+		fileInput.onchange = async (event) => {
+			const file = event.target.files[0];
+			if (!file) return;
+			const reader = new FileReader();
+			reader.onload = async () => {
+				await processImport(reader.result);
+			};
+			reader.readAsText(file);
+		};
+		fileInput.click();
+	} else {
+		input = await prompt("Paste the string to import data:");
+		if (input) await processImport(input.trim());
+	}
 }
 
 async function processImport(input) {
-  const password = await prompt("Enter password for importing data:", 1);
-  if (!password) return;
-  try {
-    const decrypted = await decryptText(input, password);
-    const combined = JSON.parse(decrypted);
-    mergeImportedKeys(combined.keys);
-    mergeImportedMasterKeys(combined.masterKeys);
-    saveKeys();
-    await saveMasterKeys();
-    await updateDecryptionForKeys();
-    renderKeys();
-    updateAllKeyCards();
-    alert("Data imported successfully!");
-  } catch (e) {
-    alert("Error importing data: " + e.message);
-  }
+	const password = await prompt("Enter password for importing data:", 1);
+	if (!password) return;
+	try {
+		const decrypted = await decryptText(input, password);
+		const combined = JSON.parse(decrypted);
+		mergeImportedKeys(combined.keys);
+		mergeImportedMasterKeys(combined.masterKeys);
+		saveKeys();
+		await saveMasterKeys();
+		await updateDecryptionForKeys();
+		renderKeys();
+		updateAllKeyCards();
+		alert("Data imported successfully!");
+	} catch (e) {
+		alert("Error importing data: " + e.message);
+	}
 }
 
 function mergeImportedKeys(importedKeys) {
-  if (importedKeys) {
-    importedKeys.forEach((newKey) => {
-      const existingKey = keys.find((k) => k.id === newKey.id);
-      if (existingKey) {
-        if (existingKey.title !== newKey.title) {
-          existingKey.title = newKey.title;
-        }
-      } else {
-        keys.push(newKey);
-      }
-    });
-  }
+	if (importedKeys) {
+		importedKeys.forEach((newKey) => {
+			const existingKey = keys.find((k) => k.id === newKey.id);
+			if (existingKey) {
+				if (existingKey.title !== newKey.title) {
+					existingKey.title = newKey.title;
+				}
+			} else {
+				keys.push(newKey);
+			}
+		});
+	}
 }
 
 function mergeImportedMasterKeys(importedMasterKeys) {
-  if (importedMasterKeys) {
-    importedMasterKeys.forEach((newMk) => {
-      if (!masterKeys.find((mk) => mk.hash === newMk.hash)) {
-        masterKeys.push(newMk);
-      }
-    });
-  }
+	if (importedMasterKeys) {
+		importedMasterKeys.forEach((newMk) => {
+			if (!masterKeys.find((mk) => mk.hash === newMk.hash)) {
+				masterKeys.push(newMk);
+			}
+		});
+	}
 }
 
 // ================================
@@ -932,342 +870,308 @@ function mergeImportedMasterKeys(importedMasterKeys) {
 // ================================
 
 function initEventListeners() {
-  document.getElementById("copyButton").addEventListener("click", async function () {
-    const textarea = document.getElementById("copyTextArea");
-    try {
-      await navigator.clipboard.writeText(textarea.value);
-      alert("Copied to clipboard!");
-    } catch (e) {
-      alert("Copy failed: " + e.message);
-    }
-    document.getElementById("copyModal").style.display = "none";
-  });
-
-  document.getElementById("clearStorageBtn").addEventListener("click", function () {
-    if (
-      !confirm(
-        "Are you sure you want to permanently clear all data? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-    localStorage.removeItem("authKeys");
-    localStorage.removeItem("masterKeys");
-    localStorage.removeItem("masterKeysEncKeyHash");
-    history.replaceState(null, "", window.location.pathname);
-    sessionEncKey = null;
-    loadKeys();
-    loadMasterKeys();
-    renderKeys();
-    updateEncButton();
-  });
-
-window.addEventListener("click", function (event) {
-  const modals = [
-    { element: document.getElementById("manageMasterModal"), closeFunction: () => closeModal("manageMasterModal") },
-    { element: document.getElementById("managesecretKeysModal"), closeFunction: () => closeModal("managesecretKeysModal") },
-    { element: document.getElementById("settingsModal"), closeFunction: () => closeModal("settingsModal") },
-    { element: document.getElementById("addKeyModal"), closeFunction: () => closeModal("addKeyModal") },
-    { element: document.getElementById("qrScannerModal"), closeFunction: () => closeModal("qrScannerModal") }
-  ];
-
-  modals.forEach(modal => {
-    if (event.target === modal.element) {
-      modal.closeFunction();
-    }
-  });
-});
-	
-document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", function () {
-    masterKeysRevealed = !masterKeysRevealed;
-    this.textContent = masterKeysRevealed ? "Hide master keys" : "Reveal master keys";
-    renderMasterKeysTable();
-  });
+	document.getElementById("copyButton").addEventListener("click", async function() {
+		const textarea = document.getElementById("copyTextArea");
+		try {
+			await navigator.clipboard.writeText(textarea.value);
+			alert("Copied to clipboard!");
+		} catch (e) {
+			alert("Copy failed: " + e.message);
+		}
+		document.getElementById("copyModal").style.display = "none";
+	});
+	document.getElementById("clearStorageBtn").addEventListener("click", function() {
+		if (!confirm("Are you sure you want to permanently clear all data? This action cannot be undone.")) {
+			return;
+		}
+		localStorage.removeItem("authKeys");
+		localStorage.removeItem("masterKeys");
+		localStorage.removeItem("masterKeysEncKeyHash");
+		history.replaceState(null, "", window.location.pathname);
+		sessionEncKey = null;
+		loadKeys();
+		loadMasterKeys();
+		renderKeys();
+		updateEncButton();
+	});
+	window.addEventListener("click", function(event) {
+		const modals = [{
+			element: document.getElementById("manageMasterModal"),
+			closeFunction: () => closeModal("manageMasterModal")
+		}, {
+			element: document.getElementById("managesecretKeysModal"),
+			closeFunction: () => closeModal("managesecretKeysModal")
+		}, {
+			element: document.getElementById("settingsModal"),
+			closeFunction: () => closeModal("settingsModal")
+		}, {
+			element: document.getElementById("addKeyModal"),
+			closeFunction: () => closeModal("addKeyModal")
+		}, {
+			element: document.getElementById("qrScannerModal"),
+			closeFunction: () => closeModal("qrScannerModal")
+		}];
+		modals.forEach(modal => {
+			if (event.target === modal.element) {
+				modal.closeFunction();
+			}
+		});
+	});
+	document.getElementById("toggleRevealMasterKeysBtn")?.addEventListener("click", function() {
+		masterKeysRevealed = !masterKeysRevealed;
+		this.textContent = masterKeysRevealed ? "Hide master keys" : "Reveal master keys";
+		renderMasterKeysTable();
+	});
 }
 
 function startCameraScan() {
-  closeModal('addKeyModal');
-  openModal('qrScannerModal');
-  startCamera();
+	closeModal('addKeyModal');
+	openModal('qrScannerModal');
+	startCamera();
 }
 
 function handleFileSelection(event) {
-  const files = Array.from(event.target.files);
-  files.forEach(file => {
-    const reader = new FileReader();
-    const img = new Image();
-
-    reader.onload = function(e) {
-      img.src = e.target.result;
-      img.onload = function() {
-        parseQRCode(img);
-      };
-    };
-
-    reader.readAsDataURL(file);
-  });
+	const files = Array.from(event.target.files);
+	files.forEach(file => {
+		const reader = new FileReader();
+		const img = new Image();
+		reader.onload = function(e) {
+			img.src = e.target.result;
+			img.onload = function() {
+				parseQRCode(img);
+			};
+		};
+		reader.readAsDataURL(file);
+	});
 }
 
 function startCamera() {
-  const video = document.getElementById('video');
-
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-    .then(stream => {
-      video.srcObject = stream;
-      video.setAttribute("playsinline", true);
-      video.play();
-      requestAnimationFrame(scanQRCode);
-    })
-    .catch(err => console.warn(err));
+	const video = document.getElementById('video');
+	navigator.mediaDevices.getUserMedia({
+		video: {
+			facingMode: "environment"
+		}
+	}).then(stream => {
+		video.srcObject = stream;
+		video.setAttribute("playsinline", true);
+		video.play();
+		requestAnimationFrame(scanQRCode);
+	}).catch(err => console.warn(err));
 }
 
 function stopCamera() {
-  const video = document.getElementById('video');
-  if (video.srcObject) {
-    video.srcObject.getTracks().forEach(track => track.stop());
-    video.srcObject = null;
-  }
+	const video = document.getElementById('video');
+	if (video.srcObject) {
+		video.srcObject.getTracks().forEach(track => track.stop());
+		video.srcObject = null;
+	}
 }
 
 function scanQRCode() {
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  canvas.willReadFrequently = true;
-  const ctx = canvas.getContext('2d');
-  const modal = document.getElementById('qrScannerModal');
-
-  if (modal.style.display !== "flex") {
-    stopCamera();
-    return;
-  }
-
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-    canvas.height = video.videoHeight;
-    canvas.width = video.videoWidth;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-
-    if (qrCode) {
-      parseQRCodeFromText(qrCode.data);
-      closeModal("qrScannerModal");
-    }
-  }
-  requestAnimationFrame(scanQRCode);
+	const video = document.getElementById('video');
+	const canvas = document.getElementById('canvas');
+	canvas.willReadFrequently = true;
+	const ctx = canvas.getContext('2d');
+	const modal = document.getElementById('qrScannerModal');
+	if (modal.style.display !== "flex") {
+		stopCamera();
+		return;
+	}
+	if (video.readyState === video.HAVE_ENOUGH_DATA) {
+		canvas.height = video.videoHeight;
+		canvas.width = video.videoWidth;
+		ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+		const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+		const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+		if (qrCode) {
+			parseQRCodeFromText(qrCode.data);
+			closeModal("qrScannerModal");
+		}
+	}
+	requestAnimationFrame(scanQRCode);
 }
 
 function parseQRCode(image) {
-  const canvas = document.getElementById('canvas');
-  canvas.willReadFrequently = true;
-  const ctx = canvas.getContext('2d');
-  canvas.width = image.width;
-  canvas.height = image.height;
-  ctx.drawImage(image, 0, 0);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-
-  if (qrCode) {
-    parseQRCodeFromText(qrCode.data);
-  } else {
-    alert('QR code not found.');
-  }
+	const canvas = document.getElementById('canvas');
+	canvas.willReadFrequently = true;
+	const ctx = canvas.getContext('2d');
+	canvas.width = image.width;
+	canvas.height = image.height;
+	ctx.drawImage(image, 0, 0);
+	const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+	const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+	if (qrCode) {
+		parseQRCodeFromText(qrCode.data);
+	} else {
+		alert('QR code not found.');
+	}
 }
 
 function parseQRCodeFromText(qrText) {
-
-  if (qrText.startsWith('otpauth-migration://')) {
-    const urlObj = new URL(qrText);
-    let dataParam = urlObj.searchParams.get('data');
-    if (dataParam) {
-      dataParam = decodeURIComponent(dataParam);
-      parseOtpauthMigration(dataParam);
-    }
-    return;
-  }
-
-  const prefix = 'otpauth://totp/';
-  if (!qrText.startsWith(prefix)) {
-    console.warn('QR text does not start with expected prefix. Full text:', qrText);
-    alert('Invalid QR code format.');
-    return;
-  }
-
-  const decodedQRText = decodeURIComponent(qrText);
-  const remainingText = decodedQRText.slice(prefix.length);
-  const parts = remainingText.split('?secret=');
-  if (parts.length !== 2) {
-    console.warn('Could not find secret part in QR code. Full remaining text:', remainingText);
-    alert('Invalid QR code format: Missing "secret=".');
-    return;
-  }
-
-  let title = parts[0].replace(':', ': ');
-  const keyValueWithIssuer = parts[1];
-
-  const issuerMatch = keyValueWithIssuer.match(/&issuer=([a-zA-Z0-9@.]+)/);
-  const issuer = issuerMatch ? issuerMatch[1] : '';
-
-  const keyValue = keyValueWithIssuer.split('&')[0];
-  if (issuer && !title.includes(issuer)) {
-    title = `${issuer}: ${title}`;
-  }
-
-  addKey(title, keyValue);
+	if (qrText.startsWith('otpauth-migration://')) {
+		const urlObj = new URL(qrText);
+		let dataParam = urlObj.searchParams.get('data');
+		if (dataParam) {
+			dataParam = decodeURIComponent(dataParam);
+			parseOtpauthMigration(dataParam);
+		}
+		return;
+	}
+	const prefix = 'otpauth://totp/';
+	if (!qrText.startsWith(prefix)) {
+		console.warn('QR text does not start with expected prefix. Full text:', qrText);
+		alert('Invalid QR code format.');
+		return;
+	}
+	const decodedQRText = decodeURIComponent(qrText);
+	const remainingText = decodedQRText.slice(prefix.length);
+	const parts = remainingText.split('?secret=');
+	if (parts.length !== 2) {
+		console.warn('Could not find secret part in QR code. Full remaining text:', remainingText);
+		alert('Invalid QR code format: Missing "secret=".');
+		return;
+	}
+	let title = parts[0].replace(':', ': ');
+	const keyValueWithIssuer = parts[1];
+	const issuerMatch = keyValueWithIssuer.match(/&issuer=([a-zA-Z0-9@.]+)/);
+	const issuer = issuerMatch ? issuerMatch[1] : '';
+	const keyValue = keyValueWithIssuer.split('&')[0];
+	if (issuer && !title.includes(issuer)) {
+		title = `${issuer}: ${title}`;
+	}
+	addKey(title, keyValue);
 }
 
 function parseOtpauthMigration(dataParam) {
-  try {
-    if (!dataParam) throw new Error("data parameter is empty");
-
-    const bytes = base64ToUint8Array(dataParam);
-
-    const root = protobuf.parse(protoDefinition).root;
-    const MigrationPayload = root.lookupType("migration.MigrationPayload");
-    const payload = MigrationPayload.decode(bytes);
-
-    const object = MigrationPayload.toObject(payload, {
-      longs: String,
-      enums: String,
-      bytes: String,
-      defaults: true
-    });
-
-    object.otpParameters.forEach(param => {
-      let paramName = param.name;
-      const issuer = param.issuer || '';
-
-      if (issuer && !paramName.includes(issuer)) {
-        paramName = `${issuer}: ${paramName}`;
-      }
-
-      addKey(paramName, param.secret);
-    });
-  } catch (error) {
-    console.error("Error parsing otpauth-migration:", error.message);
-  }
+	try {
+		if (!dataParam) throw new Error("data parameter is empty");
+		const bytes = base64ToUint8Array(dataParam);
+		const root = protobuf.parse(protoDefinition).root;
+		const MigrationPayload = root.lookupType("migration.MigrationPayload");
+		const payload = MigrationPayload.decode(bytes);
+		const object = MigrationPayload.toObject(payload, {
+			longs: String,
+			enums: String,
+			bytes: String,
+			defaults: true
+		});
+		object.otpParameters.forEach(param => {
+			let paramName = param.name;
+			const issuer = param.issuer || '';
+			if (issuer && !paramName.includes(issuer)) {
+				paramName = `${issuer}: ${paramName}`;
+			}
+			addKey(paramName, param.secret);
+		});
+	} catch (error) {
+		console.error("Error parsing otpauth-migration:", error.message);
+	}
 }
 
 async function addKey(title = null, keyValue = null) {
-  if (!title) {
-    title = await prompt("Enter key name:");
-    if (!title) return;
-  }
-
-  if (!keyValue) {
-    keyValue = await prompt("Enter key value (secret):", 1);
-    if (!keyValue) return;
-  }
-
-  const selectedMasterKey = await chooseMasterKey();
-  if (!selectedMasterKey) return;
-  
-  try {
-    const encrypted = await encryptText(keyValue, selectedMasterKey.password);
-    const id = await sha256(title + keyValue);
-    const keyObj = {
-      id: id,
-      title: title,
-      encryptedKey: encrypted,
-      encryptionHash: selectedMasterKey.hash,
-    };
-
-    if (!keys.find((k) => k.id === id)) {
-      keys.push(keyObj);
-    }
-    saveKeys();
-    appendKeyCard(keyObj);
-    updateKeyCard(keyObj);
-    closeModal('addKeyModal');
-	
-  } catch (e) {
-    alert("Error encrypting key: " + e.message);
-  }
+	if (!title) {
+		title = await prompt("Enter key name:");
+		if (!title) return;
+	}
+	if (!keyValue) {
+		keyValue = await prompt("Enter key value (secret):", 1);
+		if (!keyValue) return;
+	}
+	const selectedMasterKey = await chooseMasterKey();
+	if (!selectedMasterKey) return;
+	try {
+		const encrypted = await encryptText(keyValue, selectedMasterKey.password);
+		const id = await sha256(title + keyValue);
+		const keyObj = {
+			id: id,
+			title: title,
+			encryptedKey: encrypted,
+			encryptionHash: selectedMasterKey.hash,
+		};
+		if (!keys.find((k) => k.id === id)) {
+			keys.push(keyObj);
+		}
+		saveKeys();
+		appendKeyCard(keyObj);
+		updateKeyCard(keyObj);
+		closeModal('addKeyModal');
+	} catch (e) {
+		alert("Error encrypting key: " + e.message);
+	}
 }
 
 async function chooseMasterKey() {
-  if (masterKeys.length === 0) {
-    await addMasterKey();
-  }
-  if (masterKeys.length === 1) {
-    return masterKeys[0];
-  } else {
-    while (true) {
-      const options = masterKeys
-        .map(
-          (mk, idx) =>
-            (idx + 1) +
-            ": " +
-            mk.hash.substring(0, 6) +
-            "..." +
-            " (" +
-            mk.password.substring(0, 4) +
-            "...)"
-        )
-        .join("\n");
-      const choice = await prompt(
-        "Choose a master key for encryption:\n0. Add new master key\n" + options
-      );
-      const index = parseInt(choice) - 1;
-      if (index >= 0 && index < masterKeys.length) {
-        return masterKeys[index];
-      } else if (index === masterKeys.length) {
-        await addMasterKey();
-        return await chooseMasterKey();
-      }
-    }
-  }
+	if (masterKeys.length === 0) {
+		await addMasterKey();
+	}
+	if (masterKeys.length === 1) {
+		return masterKeys[0];
+	} else {
+		while (true) {
+			const options = masterKeys.map(
+				(mk, idx) => (idx + 1) + ": " + mk.hash.substring(0, 6) + "..." + " (" + mk.password.substring(0, 4) + "...)").join("\n");
+			const choice = await prompt("Choose a master key for encryption:\n0. Add new master key\n" + options);
+			const index = parseInt(choice) - 1;
+			if (index >= 0 && index < masterKeys.length) {
+				return masterKeys[index];
+			} else if (index === masterKeys.length) {
+				await addMasterKey();
+				return await chooseMasterKey();
+			}
+		}
+	}
 }
 
 async function addMasterKey() {
-  const input = await prompt("Enter master key:", 1);
-  if (!input) return;
-  const hash = await sha256(input);
-  if (masterKeys.some((mk) => mk.hash === hash)) {
-    alert("Master key already added");
-    return;
-  }
-  masterKeys.push({
-    password: input,
-    hash: hash,
-  });
-  await saveMasterKeys();
-  await updateDecryptionForKeys();
-  renderKeys();
-  await updateAllKeyCards();
-  updateEncButton();
-  if (document.getElementById("manageMasterModal").style.display !== "none") {
-    renderMasterKeysTable();
-  }
+	const input = await prompt("Enter master key:", 1);
+	if (!input) return;
+	const hash = await sha256(input);
+	if (masterKeys.some((mk) => mk.hash === hash)) {
+		alert("Master key already added");
+		return;
+	}
+	masterKeys.push({
+		password: input,
+		hash: hash,
+	});
+	await saveMasterKeys();
+	await updateDecryptionForKeys();
+	renderKeys();
+	await updateAllKeyCards();
+	updateEncButton();
+	if (document.getElementById("manageMasterModal").style.display !== "none") {
+		renderMasterKeysTable();
+	}
 }
 
 function startOTPUpdater() {
-  const now = Date.now();
-  const nextUpdate = 30000 - (now % 30000);
-  updateAllKeyCards();
-  setTimeout(() => {
-    updateAllKeyCards();
-    setInterval(updateAllKeyCards, 30000);
-  }, nextUpdate);
+	const now = Date.now();
+	const nextUpdate = 30000 - (now % 30000);
+	updateAllKeyCards();
+	setTimeout(() => {
+		updateAllKeyCards();
+		setInterval(updateAllKeyCards, 30000);
+	}, nextUpdate);
 }
 
 function updateProgressCircles() {
-  const now = Date.now();
-  const elapsed = now % 30000;
-  const remaining = 30000 - elapsed;
-  const angle = (remaining / 30000) * 360;
-  document.querySelectorAll(".progress-fill").forEach(function (elem) {
-    elem.style.background = `conic-gradient(#58a6ff ${angle}deg, #161b22 ${angle}deg)`;
-  });
-  requestAnimationFrame(updateProgressCircles);
+	const now = Date.now();
+	const elapsed = now % 30000;
+	const remaining = 30000 - elapsed;
+	const angle = (remaining / 30000) * 360;
+	document.querySelectorAll(".progress-fill").forEach(function(elem) {
+		elem.style.background = `conic-gradient(#58a6ff ${angle}deg, #161b22 ${angle}deg)`;
+	});
+	requestAnimationFrame(updateProgressCircles);
 }
 
 async function init() {
-  loadKeys();
-  await loadMasterKeys();
-  renderKeys();
-  startOTPUpdater();
-  updateProgressCircles();
-  initEventListeners();
+	loadKeys();
+	await loadMasterKeys();
+	renderKeys();
+	startOTPUpdater();
+	updateProgressCircles();
+	initEventListeners();
 }
 document.addEventListener("DOMContentLoaded", init);
 
