@@ -224,58 +224,40 @@ async function loadMasterKeys() {
 	const stored = localStorage.getItem("masterKeys");
 	if (!stored) return void (masterKeys = [], sessionEncKey = null, updateURL(), updateEncButton());
 
-	const tryParseJSON = str => {
-		try { return JSON.parse(str); } catch { return null; }
-	};
+	try {
+		const parsed = JSON.parse(stored);
 
-	let parsed = tryParseJSON(stored);
-
-	if (Array.isArray(parsed)) {
-		masterKeys = parsed;
-		sessionEncKey = null;
-	} else if (parsed?.data && parsed?.iv && parsed?.salt) {
-		let valid = false;
-		while (!valid) {
-			sessionEncKey = await prompt(
-				"test Enter master keys encryption key (or type 'CLEAR MASTERKEYS' to clear)", 1, 1
-			);
-
-			if (!sessionEncKey) continue;
-
-			const cmd = sessionEncKey.toUpperCase();
-
-			if (cmd === "CLEAR MASTERKEYS") {
-				localStorage.removeItem("masterKeys");
-				masterKeys = [];
-				sessionEncKey = null;
-				break;
+		if (Array.isArray(parsed)) {
+			masterKeys = parsed;
+			sessionEncKey = null;
+		} else if (parsed?.data && parsed?.iv && parsed?.salt) {
+			let valid = false;
+			while (!valid) {
+				sessionEncKey = await prompt(
+					"Enter master keys encryption key (or type 'CLEAR MASTERKEYS' to clear)",
+					1, 1
+				);
+				if (sessionEncKey === "CLEAR MASTERKEYS") {
+					localStorage.removeItem("masterKeys");
+					masterKeys = [];
+					sessionEncKey = null;
+					break;
+				}
+				try {
+					masterKeys = JSON.parse(await decryptText(stored, sessionEncKey));
+					valid = true;
+				} catch {
+					alert("Incorrect key or corrupted data. Try again.");
+				}
 			}
-
-			if (cmd === "PARSE") {
-				masterKeys = tryParseJSON(stored) || [];
-				sessionEncKey = null;
-				valid = true;
-				break;
-			}
-
-			if (cmd === "SHOW") {
-				const toShow = masterKeys.length ? masterKeys : [parsed];
-				const serialized = JSON.stringify(toShow, null, 2);
-				showNotification(serialized);
-				sessionEncKey = null;
-				valid = true;
-				break;
-			}
-
-			try {
-				masterKeys = JSON.parse(await decryptText(stored, sessionEncKey));
-				valid = true;
-			} catch {
-				alert("Incorrect key or corrupted data. Try again.");
-			}
+		} else {
+			console.warn("Unknown masterKeys format");
+			masterKeys = [];
+			sessionEncKey = null;
 		}
-	} else {
-		masterKeys = tryParseJSON(stored) || [];
+	} catch {
+		console.error("Failed to parse masterKeys");
+		masterKeys = [];
 		sessionEncKey = null;
 	}
 	updateURL();
