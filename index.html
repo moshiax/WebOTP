@@ -222,7 +222,13 @@ function saveKeys() {
 
 async function loadMasterKeys() {
 	const stored = localStorage.getItem("masterKeys");
-	if (!stored) return void (masterKeys = [], sessionEncKey = null, updateURL(), updateEncButton());
+	if (!stored) {
+		masterKeys = [];
+		sessionEncKey = null;
+		updateURL();
+		updateEncButton();
+		return;
+	}
 
 	try {
 		const parsed = JSON.parse(stored);
