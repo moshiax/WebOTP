@@ -1159,7 +1159,9 @@ function parseOtpauthMigration(dataParam, masterKey) {
                 ? `${issuer}: ${accountNameOriginal}`
                 : accountNameOriginal;
 
-            addKeyUI(accountName, param.secret, {
+            const base32Secret = base64ToBase32(param.secret);
+
+            addKeyUI(accountName, base32Secret, {
                 issuer,
                 digits: 6, // Google Authenticator export sets "digits" to random shit like 2
                 period: param.period || 30,

@@ -156,3 +156,20 @@ function base32ToUint8Array(base32) {
 
   return new Uint8Array(output);
 }
+
+function base64ToBase32(base64) {
+    const bytes = base64ToUint8Array(base64);
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let bits = '', base32 = '';
+
+    for (let byte of bytes) {
+        bits += byte.toString(2).padStart(8, '0');
+    }
+
+    for (let i = 0; i < bits.length; i += 5) {
+        const chunk = bits.substring(i, i + 5);
+        base32 += alphabet[parseInt(chunk.padEnd(5, '0'), 2)];
+    }
+
+    return base32;
+}
