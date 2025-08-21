@@ -23,27 +23,24 @@ function updateURL() {
         return;
     }
 
-    const data = JSON.stringify(keys);
+    const keysForURL = keys.map(k => prepareKey(k, { shortImport: true }));
+
+    const data = JSON.stringify(keysForURL);
     const base64Data = base64EncodeUnicode(data);
-    const newURL =
-        window.location.origin +
-        window.location.pathname +
-        "#keys=" +
-        base64Data;
+    const newURL = window.location.origin + window.location.pathname + "#keys=" + base64Data;
     history.replaceState(null, "", newURL);
 }
 
 function getKeysFromURL() {
-  if (window.location.hash.startsWith("#keys=")) {
-    try {
-      return JSON.parse(
-        base64DecodeUnicode(window.location.hash.substring(6))
-      );
-    } catch (e) {
-      console.error("Error reading keys from URL. e:", e, "Full URL:", window.location.href);
+    if (window.location.hash.startsWith("#keys=")) {
+        try {
+            const rawKeys = JSON.parse(base64DecodeUnicode(window.location.hash.substring(6)));
+            return rawKeys.map(k => prepareKey(k, { shortImport: false }));
+        } catch (e) {
+            console.error("Error reading keys from URL:", e);
+        }
     }
-  }
-  return null;
+    return null;
 }
 
 // ================================

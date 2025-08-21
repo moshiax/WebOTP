@@ -98,19 +98,46 @@ async function decryptText(encryptedData, password) {
   }
 }
 
-async function generateOTP(secret) {
-  const epoch = Math.floor(Date.now() / 1000);
-  const timeStep = 30;
-  const counter = BigInt(Math.floor(epoch / timeStep));
-  const buffer = new ArrayBuffer(8);
-  new DataView(buffer).setBigUint64(0, counter, false);
-  const keyData = base32ToUint8Array(secret);
-  const cryptoKey = await crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
-  const hmac = await crypto.subtle.sign('HMAC', cryptoKey, buffer);
-  const hmacBytes = new Uint8Array(hmac);
-  const offset = hmacBytes[hmacBytes.length - 1] & 0xf;
-  const binary = ((hmacBytes[offset] & 0x7f) << 24) | ((hmacBytes[offset + 1] & 0xff) << 16) | ((hmacBytes[offset + 2] & 0xff) << 8) | (hmacBytes[offset + 3] & 0xff);
-  return (binary % 1000000).toString().padStart(6, '0');
+async function generateOTP(keyObj) {
+
+    const digits = keyObj.digits
+    const period = keyObj.period
+	const algorithm = (() => {
+		switch (keyObj.algorithm) {
+			case "SHA1": return "SHA-1";
+			case "SHA256": return "SHA-256";
+			case "SHA512": return "SHA-512";
+			default:
+				console.error(`generateOTP: Unsupported algorithm "${keyObj.algorithm}"`);
+				throw new Error("Unsupported algorithm");
+		}
+	})();
+
+    const epoch = Math.floor(Date.now() / 1000);
+    const counter = BigInt(Math.floor(epoch / period));
+    const buffer = new ArrayBuffer(8);
+    new DataView(buffer).setBigUint64(0, counter, false);
+
+    const keyData = base32ToUint8Array(keyObj.secret);
+
+    const cryptoKey = await crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: { name: algorithm } },
+        false,
+        ['sign']
+    );
+
+    const hmac = await crypto.subtle.sign('HMAC', cryptoKey, buffer);
+    const hmacBytes = new Uint8Array(hmac);
+    const offset = hmacBytes[hmacBytes.length - 1] & 0xf;
+    const binary = ((hmacBytes[offset] & 0x7f) << 24) |
+                   ((hmacBytes[offset + 1] & 0xff) << 16) |
+                   ((hmacBytes[offset + 2] & 0xff) << 8) |
+                   (hmacBytes[offset + 3] & 0xff);
+
+    const otp = (BigInt(binary) % 10n ** BigInt(digits)).toString().padStart(digits, '0');
+    return otp;
 }
 
 function base32ToUint8Array(base32) {

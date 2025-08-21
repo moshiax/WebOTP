@@ -16,7 +16,7 @@
     <main>
 <div id="keysContainer"></div>
 <div class="buttonContainer">
-  <button id="addKeyBtn" onclick="openModal('addKeyModal')">Add Key</button>
+  <button id="addKeyUIBtn" onclick="openModal('addKeyUIModal')">Add Key</button>
   <button class="addMasterKeyBtn" onclick="addMasterKey()">Add master key</button>
   <button id="managesecretKeysBtn" onclick="openManagesecretKeysModal()">My secret keys</button>
   <button id="manageMasterKeysBtn" onclick="openManageMasterModal()">My master keys</button>
@@ -57,9 +57,9 @@
         <div id="masterEncryptionControls" style="text-align: center; margin-top: 10px;"></div>
       </div>
     </div>
-	<div id="addKeyModal" class="modal">
+	<div id="addKeyUIModal" class="modal">
 	  <div class="modal-content">
-		<span id="closeAddKeyModal" class="close" onclick="closeModal('addKeyModal');">&times;</span>
+		<span id="closeaddKeyUIModal" class="close" onclick="closeModal('addKeyUIModal');">&times;</span>
 		<h2 style="text-align: center;">Choose Source</h2>
 		<div style="text-align: center;">
 		  <button onclick="startCameraScan()">From Camera (QR)</button>
@@ -67,7 +67,7 @@
 		  <input type="file" id="file-input" accept="image/*" style="display: none;" multiple onchange="handleFileSelection(event)">
 		  <button onclick="document.getElementById('file-input').click()">From Gallery (QR)</button>
 		  <br>
-		  <button onclick="addKey()">From Secret Key (TEXT)</button>
+		  <button onclick="addKeyUI()">From Secret Key (TEXT)</button>
 		</div>
 	  </div>
 	</div>
@@ -131,6 +131,20 @@
 <script src="external/jsQR.js"></script>
 <script src="external/protobuf.js"></script>
 <script>
+console.log("Full URL:", window.location.href);
+
+if (window.location.href.includes('eruda=true')) {
+    console.log("Eruda detected in URL, injecting...");
+    const script = document.createElement('script');
+    script.src = "https://cdn.jsdelivr.net/npm/eruda";
+    script.onload = () => {
+        eruda.init();
+    };
+    document.body.appendChild(script);
+}
+</script>
+
+<script>
 const settings = {
 	passwordHideOn: {
 		label: "Hide Password Input",
@@ -181,29 +195,31 @@ let sessionEncKey = null;
 let secretKeysRevealed = false;
 
 function loadKeys() {
-	let fromUrl = getKeysFromURL();
-	const stored = localStorage.getItem("authKeys");
-	if (stored) {
-		keys = JSON.parse(stored);
-		keys.forEach(key => {
-			delete key.decryptedSecret;
-			delete key.status;
-		});
-		if (fromUrl) {
-			mergeKeys(fromUrl);
-		}
-	} else if (fromUrl) {
-		keys = fromUrl;
-		localStorage.setItem("authKeys", JSON.stringify(keys));
-	} else {
-		keys = [];
-	}
-	updateURL();
+    let fromUrl = getKeysFromURL();
+    const stored = localStorage.getItem("authKeys");
+
+    if (stored) {
+        keys = JSON.parse(stored);
+
+        if (fromUrl) {
+            fromUrl.forEach(fk => {
+                const exists = keys.find(k => k.id === fk.id);
+                if (!exists) keys.push(fk);
+            });
+        }
+    } else if (fromUrl) {
+        keys = fromUrl;
+    } else {
+        keys = [];
+    }
+
+    localStorage.setItem("authKeys", JSON.stringify(keys));
+    updateURL();
 }
 
 function mergeKeys(fromUrl) {
 	for (const keyObj of fromUrl) {
-		if (!keys.find((k) => k.id === keyObj.id)) {
+		if (!keys.find((keyObj) => keyObj.id === keyObj.id)) {
 			keys.push(keyObj);
 		}
 	}
@@ -356,7 +372,7 @@ function updateMasterEncryptionControls() {
 
 function deleteKey(keyObj) {
 	if (confirm("Are you sure you want to delete this key?")) {
-		keys = keys.filter((k) => k.id !== keyObj.id);
+		keys = keys.filter((keyObj) => keyObj.id !== keyObj.id);
 		saveKeys();
 		const cardToDelete = document.getElementById("key-" + keyObj.id);
 		if (cardToDelete) {
@@ -367,96 +383,106 @@ function deleteKey(keyObj) {
 		}
 	}
 }
+function showCopyModal(text) {
+	const modal = document.getElementById("copyModal");
+	const textarea = document.getElementById("copyTextArea");
+	textarea.value = text;
+	modal.style.display = "flex";
+}
 const keyCardTemplate = `
-	<div class="key-card">
-		<button class="delete-btn" title="Delete this key">&times;</button>
-		<div class="public-values">
-			<div class="title">
-				<strong>Name:</strong>
-				<span class="editable-title" data-key-id="" contenteditable="true" spellcheck="false"></span>
-			</div>
-			<div class="otp">
-				<strong>OTP:</strong>
-				<span class="otp-value" style="cursor:pointer;">N/A</span>
-			</div>
-			<div class="status-wrapper">
-				<div class="status-container">
-					<strong>Status:</strong>
-					<span class="status" data-key-id="">Unknown</span>
-				</div>
-				<div class="otp-progress-container">
-					<div class="progress-container">
-						<div class="progress-circle"></div>
-						<div class="progress-fill"></div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
+<div class="key-card">
+  <div class="progress-line" style="
+    position:absolute; top:0; left:0; height:2%; width:100%;
+    background:#161b22; display:block;">
+    <div class="progress-fill" style="
+      height:100%; width:0%; background:#58a6ff;"></div>
+  </div>
+
+  <button class="delete-btn" title="Delete this key">&times;</button>
+  <div class="public-values">
+    <div class="title">
+      <strong>Name:</strong>
+      <span class="editable-title" data-key-id="" contenteditable="true" spellcheck="false"></span>
+    </div>
+    <div class="otp">
+      <strong>OTP:</strong>
+      <span class="otp-value" style="cursor:pointer;">N/A</span>
+    </div>
+    <div class="status-wrapper">
+      <div class="status-container">
+        <strong>Status:</strong>
+        <span class="status" data-key-id="">Unknown</span>
+      </div>
+    </div>
+  </div>
+</div>
 `;
 
 function createKeyCard(keyObj) {
-	const template = document.createElement("template");
-	template.innerHTML = keyCardTemplate.trim();
-	const card = template.content.firstElementChild.cloneNode(true);
-	card.id = "key-" + keyObj.id;
-	// Delete button
-	const delBtn = card.querySelector(".delete-btn");
-	delBtn.onclick = () => deleteKey(keyObj);
-	// Editable title
-	const editableTitle = card.querySelector(".editable-title");
-	editableTitle.textContent = keyObj.title;
-	editableTitle.dataset.keyId = keyObj.id;
-	editableTitle.addEventListener("blur", function() {
-		const key = keys.find(k => k.id === this.dataset.keyId);
-		if (key) {
-			const newTitle = this.textContent.trim();
-			if (newTitle && newTitle !== key.title) {
-				key.title = newTitle;
-				saveKeys();
-				this.textContent = newTitle;
-				if (document.getElementById("managesecretKeysModal").style.display !== "none") {
-					rendersecretKeysTable();
-				}
-			}
-		}
-	});
-	editableTitle.addEventListener("keydown", function(e) {
-		if (e.key === "Enter") {
-			e.preventDefault();
-			this.blur();
-		}
-	});
-	// OTP click copy
-	const otpSpan = card.querySelector(".otp-value");
-	otpSpan.id = "otp-" + keyObj.id;
-	otpSpan.addEventListener("click", function() {
-		if (/^\d{6}$/.test(this.textContent)) {
-			navigator.clipboard.writeText(this.textContent).then(() => alert("OTP copied!")).catch(e => alert("Copy failed: " + e.message));
-		}
-	});
-	// Status click to copy secret
-	const statusSpan = card.querySelector(".status");
-	statusSpan.id = "status-" + keyObj.id;
-	statusSpan.dataset.keyId = keyObj.id;
-	statusSpan.addEventListener("click", async function() {
-		const keyId = this.dataset.keyId;
-		const key = keys.find(k => k.id === keyId);
-		if (!key) return;
-		const mk = getMatchingMasterKey(key);
-		if (!mk) return;
-		try {
-			const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
-			await navigator.clipboard.writeText(decryptedSecret);
-			alert("Secret copied to clipboard!");
-		} catch (e) {
-			alert("Copy failed: " + e.message);
-		}
-	});
-	// Progress bar reference
-	const progressFill = card.querySelector(".progress-fill");
-	progressFill.id = "progress-" + keyObj.id;
-	return card;
+    const template = document.createElement("template");
+    template.innerHTML = keyCardTemplate.trim();
+    const card = template.content.firstElementChild.cloneNode(true);
+    card.id = "key-" + keyObj.id;
+
+    const delBtn = card.querySelector(".delete-btn");
+    delBtn.onclick = () => deleteKey(keyObj);
+
+    const editableTitle = card.querySelector(".editable-title");
+    editableTitle.textContent = keyObj.accountName || keyObj.title || "Unknown";
+    editableTitle.dataset.keyId = keyObj.id;
+    editableTitle.addEventListener("blur", function() {
+        const key = keys.find(keyObj => keyObj.id === this.dataset.keyId);
+        if (key) {
+            const newTitle = this.textContent.trim();
+            if (newTitle && newTitle !== (key.accountName || key.title)) {
+                key.accountName = newTitle;
+                saveKeys();
+                this.textContent = newTitle;
+                if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+                    rendersecretKeysTable();
+                }
+            }
+        }
+    });
+    editableTitle.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            this.blur();
+        }
+    });
+
+    const otpSpan = card.querySelector(".otp-value");
+    otpSpan.id = "otp-" + keyObj.id;
+    otpSpan.addEventListener("click", function() {
+        if (/^\d{6}$/.test(this.textContent)) {
+            navigator.clipboard.writeText(this.textContent).then(() => alert("OTP copied!")).catch(e => alert("Copy failed: " + e.message));
+        }
+    });
+
+    const statusSpan = card.querySelector(".status");
+    statusSpan.id = "status-" + keyObj.id;
+    statusSpan.dataset.keyId = keyObj.id;
+    statusSpan.addEventListener("click", async function() {
+        const keyId = this.dataset.keyId;
+        const key = keys.find(keyObj => keyObj.id === keyId);
+        if (!key) return;
+        const mk = getMatchingMasterKey(key);
+        if (!mk) return;
+        try {
+            const decryptedSecret = await decryptText(key.encryptedKey, mk.password);
+            await navigator.clipboard.writeText(decryptedSecret);
+            alert("Secret copied to clipboard!");
+        } catch (e) {
+            alert("Copy failed: " + e.message);
+        }
+    });
+
+    const progressFill = card.querySelector(".progress-fill");
+    progressFill.id = "progress-" + keyObj.id;
+    const period = keyObj.period || 30;
+    progressFill.dataset.period = period;
+
+    return card;
 }
 
 function renderKeys() {
@@ -479,7 +505,7 @@ function attachEditableTitleListenerToCard(cardElement) {
 	if (!titleElem) return;
 	titleElem.addEventListener("blur", function() {
 		const keyId = this.getAttribute("data-key-id");
-		const keyObj = keys.find((k) => k.id === keyId);
+		const keyObj = keys.find((keyObj) => keyObj.id === keyId);
 		if (keyObj) {
 			const newTitle = this.textContent.trim();
 			if (newTitle && newTitle !== keyObj.title) {
@@ -728,26 +754,29 @@ function getMatchingMasterKey(keyObj) {
 }
 
 async function updateKeyCard(keyObj) {
-	const otpSpan = document.getElementById("otp-" + keyObj.id);
-	const statusSpan = document.getElementById("status-" + keyObj.id);
-	const mk = getMatchingMasterKey(keyObj);
-	if (mk) {
-		try {
-			const decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
-			const otp = await generateOTP(decryptedSecret);
-			otpSpan.textContent = otp;
-			statusSpan.textContent = "Decrypted";
-			statusSpan.className = "status status-decrypted";
-		} catch (_) {
-			otpSpan.textContent = "N/A";
-			statusSpan.textContent = "Decryption error";
-			statusSpan.className = "status status-failed";
-		}
-	} else {
-		otpSpan.textContent = "N/A";
-		statusSpan.textContent = "Encrypted";
-		statusSpan.className = "status status-encrypted";
-	}
+    const otpSpan = document.getElementById("otp-" + keyObj.id);
+    const statusSpan = document.getElementById("status-" + keyObj.id);
+    const mk = getMatchingMasterKey(keyObj);
+
+    if (!mk) {
+        otpSpan.textContent = "N/A";
+        statusSpan.textContent = "Encrypted";
+        statusSpan.className = "status status-encrypted";
+        return;
+    }
+
+    try {
+        keyObj.secret = await decryptText(keyObj.encryptedKey, mk.password);
+        const otp = await generateOTP(keyObj);
+        otpSpan.textContent = otp;
+        statusSpan.textContent = "Decrypted";
+        statusSpan.className = "status status-decrypted";
+    } catch (err) {
+        otpSpan.textContent = "N/A";
+        statusSpan.textContent = "Decryption error";
+        statusSpan.className = "status status-failed";
+        console.error(`Error decrypting keyObj id=${keyObj.id}:`, err);
+    }
 }
 
 async function updateAllKeyCards() {
@@ -786,87 +815,114 @@ async function decryptKey(keyObj, mk) {
 // Export and Import
 // ================================
 
-async function exportData(toFile = false) {
-	const combined = JSON.stringify({
-		keys,
-		masterKeys
-	});
-	const password = await prompt("Enter password for exporting data:", 1);
-	if (!password) return;
-	try {
-		const encrypted = await encryptText(combined, password);
-		if (toFile) {
-			const now = new Date();
-			const timestamp = now.toISOString().replace(/[:.]/g, "-");
-			const filename = `${timestamp}.keystore`;
-			const blob = new Blob([encrypted], {
-				type: "text/plain"
-			});
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement("a");
-			a.href = url;
-			a.download = filename;
-			a.click();
-			URL.revokeObjectURL(url);
-			alert("Data exported to file: " + filename);
-		} else {
-			try {
-				await navigator.clipboard.writeText(encrypted);
-				alert("Data successfully exported and copied to clipboard!");
-			} catch {
-				showCopyModal(encrypted);
-			}
-		}
-	} catch (e) {
-		alert("Error exporting data: " + e.message);
-	}
+function prepareKey(keyObj, options = {}) {
+    const KeyObj = { 
+        id: keyObj.id,
+        accountName: keyObj.accountName || keyObj.title || "Unknown",
+        encryptedKey: keyObj.encryptedKey,
+        encryptionHash: keyObj.encryptionHash,
+        issuer: keyObj.issuer || "Unknown",
+        digits: keyObj.digits || 6,
+        period: keyObj.period || 30,
+        algorithm: keyObj.algorithm || "SHA1"
+    };
+
+    if (options.shortImport) {
+        if (KeyObj.digits === 6) delete KeyObj.digits;
+        if (KeyObj.period === 30) delete KeyObj.period;
+        if (KeyObj.algorithm === "SHA1") delete KeyObj.algorithm;
+        if (KeyObj.issuer === "Unknown") delete KeyObj.issuer;
+    }
+
+    return KeyObj;
 }
 
+async function exportData(toFile = false) {
+    const keysForExport = keys.map(k => prepareKey(k, { shortImport: false }));
+
+    const combined = JSON.stringify({ keys: keysForExport, masterKeys });
+
+    const password = await prompt("Enter password for exporting data:", 1);
+    if (!password) return;
+
+    try {
+        const encrypted = await encryptText(combined, password);
+
+        if (toFile) {
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, "-");
+            const filename = `${timestamp}.keystore`;
+            const blob = new Blob([encrypted], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            alert("Data exported to file: " + filename);
+        } else {
+            try {
+                await navigator.clipboard.writeText(encrypted);
+                alert("Data successfully exported and copied to clipboard!");
+            } catch {
+                showCopyModal(encrypted);
+            }
+        }
+    } catch (e) {
+        alert("Error exporting data: " + e.message);
+    }
+} 
+  
 async function importData(fromFile = false) {
-	let input;
-	if (fromFile) {
-		const fileInput = document.createElement("input");
-		fileInput.type = "file";
-		fileInput.accept = ".keystore";
-		fileInput.onchange = async (event) => {
-			const file = event.target.files[0];
-			if (!file) return;
-			const reader = new FileReader();
-			reader.onload = async () => {
-				await processImport(reader.result);
-			};
-			reader.readAsText(file);
-		};
-		fileInput.click();
-	} else {
-		input = await prompt("Paste the string to import data:");
-		if (input) await processImport(input.trim());
-	}
+    if (fromFile) {
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".keystore";
+        fileInput.onchange = async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async () => {
+                await processImport(reader.result);
+            };
+            reader.readAsText(file);
+        };
+        fileInput.click();
+    } else {
+        const input = await prompt("Paste the string to import data:");
+        if (input) await processImport(input.trim());
+    }
 }
 
 async function processImport(input) {
-	const password = await prompt("Enter password for importing data:", 1);
-	if (!password) return;
-	try {
-		const decrypted = await decryptText(input, password);
-		const combined = JSON.parse(decrypted);
-		mergeImportedKeys(combined.keys);
-		mergeImportedMasterKeys(combined.masterKeys);
-		saveKeys();
-		await saveMasterKeys();
-		await updateDecryptionForKeys();
-		renderKeys();
-		updateAllKeyCards();
-		alert("Data imported successfully!");
-	} catch (e) {
-		alert("Error importing data: " + e.message);
-	}
+    const password = await prompt("Enter password for importing data:", 1);
+    if (!password) return;
+
+    try {
+        const decrypted = await decryptText(input, password);
+        const combined = JSON.parse(decrypted);
+
+        if (combined.keys) {
+            const normalizedKeys = combined.keys.map(k => prepareKey(k, { shortImport: false }));
+            mergeImportedKeys(normalizedKeys);
+        }
+
+        mergeImportedMasterKeys(combined.masterKeys);
+        saveKeys();
+        await saveMasterKeys();
+        await updateDecryptionForKeys();
+        renderKeys();
+        updateAllKeyCards();
+        alert("Data imported successfully!");
+    } catch (e) {
+        alert("Error importing data: " + e.message);
+    }
 }
 
 function mergeImportedKeys(importedKeys) {
 	if (importedKeys) {
 		importedKeys.forEach((newKey) => {
-			const existingKey = keys.find((k) => k.id === newKey.id);
+			const existingKey = keys.find((keyObj) => keyObj.id === newKey.id);
 			if (existingKey) {
 				if (existingKey.title !== newKey.title) {
 					existingKey.title = newKey.title;
@@ -928,8 +984,8 @@ function initEventListeners() {
 			element: document.getElementById("settingsModal"),
 			closeFunction: () => closeModal("settingsModal")
 		}, {
-			element: document.getElementById("addKeyModal"),
-			closeFunction: () => closeModal("addKeyModal")
+			element: document.getElementById("addKeyUIModal"),
+			closeFunction: () => closeModal("addKeyUIModal")
 		}, {
 			element: document.getElementById("qrScannerModal"),
 			closeFunction: () => closeModal("qrScannerModal")
@@ -948,7 +1004,7 @@ function initEventListeners() {
 }
 
 function startCameraScan() {
-	closeModal('addKeyModal');
+	closeModal('addKeyUIModal');
 	openModal('qrScannerModal');
 	startCamera();
 }
@@ -1030,97 +1086,138 @@ function parseQRCode(image) {
 	}
 }
 
-function parseQRCodeFromText(qrText) {
-	if (qrText.startsWith('otpauth-migration://')) {
-		const urlObj = new URL(qrText);
-		let dataParam = urlObj.searchParams.get('data');
-		if (dataParam) {
-			dataParam = decodeURIComponent(dataParam);
-			parseOtpauthMigration(dataParam);
-		}
-		return;
-	}
-	const prefix = 'otpauth://totp/';
-	if (!qrText.startsWith(prefix)) {
-		console.warn('QR text does not start with expected prefix. Full text:', qrText);
-		alert('Invalid QR code format.');
-		return;
-	}
-	const decodedQRText = decodeURIComponent(qrText);
-	const remainingText = decodedQRText.slice(prefix.length);
-	const parts = remainingText.split('?secret=');
-	if (parts.length !== 2) {
-		console.warn('Could not find secret part in QR code. Full remaining text:', remainingText);
-		alert('Invalid QR code format: Missing "secret=".');
-		return;
-	}
-	let title = parts[0].replace(':', ': ');
-	const keyValueWithIssuer = parts[1];
-	const issuerMatch = keyValueWithIssuer.match(/&issuer=([a-zA-Z0-9@.]+)/);
-	const issuer = issuerMatch ? issuerMatch[1] : '';
-	const keyValue = keyValueWithIssuer.split('&')[0];
-	if (issuer && !title.includes(issuer)) {
-		title = `${issuer}: ${title}`;
-	}
-	addKey(title, keyValue);
+function parseQRCodeFromText(qrText, masterKey) {
+    console.log("Parsing QR code:", qrText);
+
+    if (qrText.startsWith('otpauth-migration://')) {
+        const urlObj = new URL(qrText);
+        let dataParam = urlObj.searchParams.get('data');
+        if (dataParam) {
+            dataParam = decodeURIComponent(dataParam);
+            console.log("Detected otpauth-migration, data parameter decoded.");
+            parseOtpauthMigration(dataParam, masterKey);
+        }
+        return;
+    }
+
+    const prefix = 'otpauth://totp/';
+    if (!qrText.startsWith(prefix)) {
+        console.warn('QR text does not start with expected prefix. Full text:', qrText);
+        alert('Invalid QR code format.');
+        return;
+    }
+
+    const decodedQRText = decodeURIComponent(qrText);
+    const remainingText = decodedQRText.slice(prefix.length);
+
+    const [path, queryString] = remainingText.split('?');
+    if (!queryString) {
+        console.warn('No query string found in QR code. Full remaining text:', remainingText);
+        alert('Invalid QR code format: Missing query parameters.');
+        return;
+    }
+
+    let accountName = path.replace(':', ': ');
+    const urlParams = new URLSearchParams(queryString);
+
+    const keyValue = urlParams.get('secret');
+    if (!keyValue) {
+        console.warn('Secret not found in QR code query string:', queryString);
+        alert('Invalid QR code: secret missing.');
+        return;
+    }
+
+    const issuer = urlParams.get('issuer') || '';
+    const digits = parseInt(urlParams.get('digits')) || 6;
+    const period = parseInt(urlParams.get('period')) || 30;
+    const algorithm = urlParams.get('algorithm') || 'SHA1';
+
+    if (issuer && !accountName.includes(issuer)) {
+        accountName = `${issuer}: ${accountName}`;
+    }
+
+    console.log("Adding key via UI:", {
+        accountName,
+        keyValue,
+        options: { issuer, digits, period, algorithm }
+    });
+
+    addKeyUI(accountName, keyValue, { issuer, digits, period, algorithm });
 }
 
-function parseOtpauthMigration(dataParam) {
-	try {
-		if (!dataParam) throw new Error("data parameter is empty");
-		const bytes = base64ToUint8Array(dataParam);
-		const root = protobuf.parse(protoDefinition).root;
-		const MigrationPayload = root.lookupType("migration.MigrationPayload");
-		const payload = MigrationPayload.decode(bytes);
-		const object = MigrationPayload.toObject(payload, {
-			longs: String,
-			enums: String,
-			bytes: String,
-			defaults: true
-		});
-		object.otpParameters.forEach(param => {
-			let paramName = param.name;
-			const issuer = param.issuer || '';
-			if (issuer && !paramName.includes(issuer)) {
-				paramName = `${issuer}: ${paramName}`;
-			}
-			addKey(paramName, param.secret);
-		});
-	} catch (error) {
-		console.error("Error parsing otpauth-migration:", error.message);
-	}
+function parseOtpauthMigration(dataParam, masterKey) {
+    try {
+        if (!dataParam) throw new Error("data parameter is empty");
+        const bytes = base64ToUint8Array(dataParam);
+        const root = protobuf.parse(protoDefinition).root;
+        const MigrationPayload = root.lookupType("migration.MigrationPayload");
+        const payload = MigrationPayload.decode(bytes);
+        const object = MigrationPayload.toObject(payload, { longs: String, enums: String, bytes: String, defaults: true });
+
+        object.otpParameters.forEach(param => {
+            let accountName = param.name;
+            const issuer = param.issuer || '';
+            if (issuer && !accountName.includes(issuer)) {
+                accountName = `${issuer}: ${accountName}`;
+            }
+
+            addKeyUI(accountName, param.secret, {
+                issuer,
+                digits: param.digits || 6,
+                period: param.period || 30,
+                algorithm: param.algorithm || 'SHA1'
+            });
+        });
+    } catch (error) {
+        console.error("Error parsing otpauth-migration:", error.message);
+    }
 }
 
-async function addKey(title = null, keyValue = null) {
-	if (!title) {
-		title = await prompt("Enter key name:");
-		if (!title) return;
-	}
-	if (!keyValue) {
-		keyValue = await prompt("Enter key value (secret):", 1);
-		if (!keyValue) return;
-	}
-	const selectedMasterKey = await chooseMasterKey();
-	if (!selectedMasterKey) return;
-	try {
-		const encrypted = await encryptText(keyValue, selectedMasterKey.password);
-		const id = await sha256(title + keyValue);
-		const keyObj = {
-			id: id,
-			title: title,
-			encryptedKey: encrypted,
-			encryptionHash: selectedMasterKey.hash,
-		};
-		if (!keys.find((k) => k.id === id)) {
-			keys.push(keyObj);
-		}
-		saveKeys();
-		appendKeyCard(keyObj);
-		updateKeyCard(keyObj);
-		closeModal('addKeyModal');
-	} catch (e) {
-		alert("Error encrypting key: " + e.message);
-	}
+async function addKey(title, keyValue, masterKey, options = {}) {
+    const encrypted = await encryptText(keyValue, masterKey.password);
+    const id = await sha256(title + keyValue);
+
+    let keyObj = {
+        id: id,
+        title: title,
+        accountName: title,
+        encryptedKey: encrypted,
+        encryptionHash: masterKey.hash,
+        issuer: options.issuer,
+        digits: options.digits,
+        period: options.period,
+        algorithm: options.algorithm
+    };
+
+    keyObj = prepareKey(keyObj);
+
+    if (!keys.find(k => k.id === id)) keys.push(keyObj);
+    saveKeys();
+    return keyObj;
+}
+
+async function addKeyUI(title = null, keyValue = null, options = {}) {
+  if (!title) {
+    title = await prompt("Enter key name:");
+    if (!title) return;
+  }
+  if (!keyValue) {
+    keyValue = await prompt("Enter key value (secret):", 1);
+    if (!keyValue) return;
+  }
+
+  const selectedMasterKey = await chooseMasterKey();
+  if (!selectedMasterKey) return;
+
+  try {
+    const keyObj = await addKey(title, keyValue, selectedMasterKey, options);
+    appendKeyCard(keyObj);
+    updateKeyCard(keyObj);
+    closeModal('addKeyUIModal');
+    console.log("Added key via UI:", keyObj);
+  } catch (e) {
+    alert("Error encrypting key: " + e.message);
+  }
 }
 
 async function chooseMasterKey() {
@@ -1177,15 +1274,25 @@ function startOTPUpdater() {
 	}, nextUpdate);
 }
 
-function updateProgressCircles() {
-	const now = Date.now();
-	const elapsed = now % 30000;
-	const remaining = 30000 - elapsed;
-	const angle = (remaining / 30000) * 360;
-	document.querySelectorAll(".progress-fill").forEach(function(elem) {
-		elem.style.background = `conic-gradient(#58a6ff ${angle}deg, #161b22 ${angle}deg)`;
-	});
-	requestAnimationFrame(updateProgressCircles);
+function updateProgressLines() {
+  const now = Date.now();
+  document.querySelectorAll(".progress-fill").forEach(e => {
+    if (!e.offsetParent) return;
+
+    const periodSec = parseFloat(e.dataset.period);
+    if (!periodSec) {
+      if (!e.dataset.warned) {
+        console.warn("Progressline has invalid period:", e.dataset.period, e);
+        e.dataset.warned = "1";
+      }
+      return;
+    }
+
+    const periodMs = periodSec * 1000;
+    e.style.width = (now % periodMs) / periodMs * 100 + "%";
+  });
+
+  requestAnimationFrame(updateProgressLines);
 }
 
 async function init() {
@@ -1193,7 +1300,7 @@ async function init() {
 	await loadMasterKeys();
 	renderKeys();
 	startOTPUpdater();
-	updateProgressCircles();
+	requestAnimationFrame(updateProgressLines);
 	initEventListeners();
 }
 document.addEventListener("DOMContentLoaded", init);
