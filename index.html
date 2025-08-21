@@ -841,22 +841,18 @@ function prepareKey(keyObj, options = {}) {
     return KeyObj;
 }
 
-async function exportData(toFile = false) {
-    const keysForExport = keys.map(k => prepareKey(k, { shortImport: false }));
-
-    const combined = JSON.stringify({ keys: keysForExport, masterKeys });
-
-    const password = await prompt("Enter password for exporting data:", 1);
+async function exportData(toFile = false, shortImport = false) {
+    const password = await prompt("Enter password for exporting data (use 'raw' for no encryption):", 1);
     if (!password) return;
 
     try {
-        const encrypted = await encryptText(combined, password);
-
+        const output = await processExport(keys, masterKeys, password, shortImport);
+        
         if (toFile) {
             const now = new Date();
             const timestamp = now.toISOString().replace(/[:.]/g, "-");
             const filename = `${timestamp}.keystore`;
-            const blob = new Blob([encrypted], { type: "text/plain" });
+            const blob = new Blob([output], { type: "text/plain" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -866,17 +862,26 @@ async function exportData(toFile = false) {
             alert("Data exported to file: " + filename);
         } else {
             try {
-                await navigator.clipboard.writeText(encrypted);
+                await navigator.clipboard.writeText(output);
                 alert("Data successfully exported and copied to clipboard!");
             } catch {
-                showCopyModal(encrypted);
+                showCopyModal(output);
             }
         }
     } catch (e) {
         alert("Error exporting data: " + e.message);
     }
-} 
-  
+}
+
+async function processExport(keysList, masterKeysList, password, shortImport = false) {
+    const keysForExport = keysList.map(k => prepareKey(k, { shortImport }));
+    const combined = JSON.stringify({ keys: keysForExport, masterKeys: masterKeysList });
+
+    if (password === "raw") return combined;
+
+    return await encryptText(combined, password);
+}
+
 async function importData(fromFile = false) {
     if (fromFile) {
         const fileInput = document.createElement("input");
@@ -899,18 +904,22 @@ async function importData(fromFile = false) {
 }
 
 async function processImport(input) {
-    const password = await prompt("Enter password for importing data:", 1);
-    if (!password) return;
+    let combined;
 
     try {
-        const decrypted = await decryptText(input, password);
-        const combined = JSON.parse(decrypted);
-
-        if (combined.keys) {
-            const normalizedKeys = combined.keys.map(k => prepareKey(k, { shortImport: false }));
-            mergeImportedKeys(normalizedKeys);
+        combined = JSON.parse(input);
+        if (!combined.keys) {
+            const password = await prompt("Enter password for encrypted data:", 1);
+            if (!password) return;
+            combined = JSON.parse(await decryptText(input, password));
         }
+    } catch (e) {
+        alert("Failed to import data: " + e.message);
+        return;
+    }
 
+    try {
+        if (combined.keys) mergeImportedKeys(combined.keys.map(k => prepareKey(k, { shortImport: false })));
         mergeImportedMasterKeys(combined.masterKeys);
         saveKeys();
         await saveMasterKeys();
@@ -919,7 +928,7 @@ async function processImport(input) {
         updateAllKeyCards();
         alert("Data imported successfully!");
     } catch (e) {
-        alert("Error importing data: " + e.message);
+        alert("Error processing imported data: " + e.message);
     }
 }
 
@@ -928,8 +937,8 @@ function mergeImportedKeys(importedKeys) {
 		importedKeys.forEach((newKey) => {
 			const existingKey = keys.find((keyObj) => keyObj.id === newKey.id);
 			if (existingKey) {
-				if (existingKey.title !== newKey.title) {
-					existingKey.title = newKey.title;
+				if (existingKey.accountName !== newKey.accountName) {
+					existingKey.accountName = newKey.accountName;
 				}
 			} else {
 				keys.push(newKey);
@@ -1173,14 +1182,13 @@ function parseOtpauthMigration(dataParam, masterKey) {
     }
 }
 
-async function addKey(title, keyValue, masterKey, options = {}) {
+async function addKey(accountName, keyValue, masterKey, options = {}) {
     const encrypted = await encryptText(keyValue, masterKey.password);
-    const id = await sha256(title + keyValue);
+    const id = await sha256(accountName + keyValue);
 
     let keyObj = {
         id: id,
-        title: title,
-        accountName: title,
+        accountName: accountName,
         encryptedKey: encrypted,
         encryptionHash: masterKey.hash,
         issuer: options.issuer,
@@ -1196,10 +1204,10 @@ async function addKey(title, keyValue, masterKey, options = {}) {
     return keyObj;
 }
 
-async function addKeyUI(title = null, keyValue = null, options = {}) {
-  if (!title) {
-    title = await prompt("Enter key name:");
-    if (!title) return;
+async function addKeyUI(accountName = null, keyValue = null, options = {}) {
+  if (!accountName) {
+    accountName = await prompt("Enter key name:");
+    if (!accountName) return;
   }
   if (!keyValue) {
     keyValue = await prompt("Enter key value (secret):", 1);
@@ -1210,14 +1218,14 @@ async function addKeyUI(title = null, keyValue = null, options = {}) {
   if (!selectedMasterKey) return;
 
   try {
-    const id = await sha256(title + keyValue);
+    const id = await sha256(accountName + keyValue);
 
     if (keys.find(k => k.id === id)) {
-      alert(`Key ${title} already imported!`);
+      alert(`Key ${accountName} already imported!`);
       return;
     }
 
-    const keyObj = await addKey(title, keyValue, selectedMasterKey, options);
+    const keyObj = await addKey(accountName, keyValue, selectedMasterKey, options);
     appendKeyCard(keyObj);
     updateKeyCard(keyObj);
     closeModal('addKeyUIModal');
