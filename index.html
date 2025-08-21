@@ -1147,10 +1147,6 @@ function parseQRCodeFromText(qrText, masterKey) {
     const period = parseInt(urlParams.get('period')) || 30;
     const algorithm = urlParams.get('algorithm') || 'SHA1';
 
-    if (issuer && !accountName.includes(issuer)) {
-        accountName = `${issuer}: ${accountName}`;
-    }
-
     addKeyUI(accountName, keyValue, { issuer, digits, period, algorithm });
 }
 
@@ -1164,12 +1160,8 @@ function parseOtpauthMigration(dataParam, masterKey) {
         const object = MigrationPayload.toObject(payload, { longs: String, enums: String, bytes: String, defaults: true });
 
         object.otpParameters.forEach(param => {
-            const accountNameOriginal = param.name || '';
+            const accountName = param.name || '';
             const issuer = param.issuer || '';
-            const accountName = issuer && !accountNameOriginal.includes(issuer)
-                ? `${issuer}: ${accountNameOriginal}`
-                : accountNameOriginal;
-
             const base32Secret = base64ToBase32(param.secret);
 
             addKeyUI(accountName, base32Secret, {
