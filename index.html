@@ -1159,11 +1159,17 @@ function parseOtpauthMigration(dataParam, masterKey) {
         const payload = MigrationPayload.decode(bytes);
         const object = MigrationPayload.toObject(payload, { longs: String, enums: String, bytes: String, defaults: true });
 
-        object.otpParameters.forEach(param => {
-            const accountName = param.name || '';
+        object.otpParameters.forEach((param, index) => {
+            let accountName = param.name || '';
             const issuer = param.issuer || '';
-            const base32Secret = base64ToBase32(param.secret);
 
+            const issuerInName = issuer && accountName.startsWith(issuer + ":");
+
+            if (issuerInName) {
+                accountName = accountName.slice((issuer + ":").length).trim();
+            }
+
+            const base32Secret = base64ToBase32(param.secret);
             addKeyUI(accountName, base32Secret, {
                 issuer,
                 digits: 6, // Google Authenticator export sets "digits" to random shit like 2
