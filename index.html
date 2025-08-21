@@ -628,7 +628,7 @@ function renderMasterKeysTable() {
 	tbody.innerHTML = "";
 	masterKeys.forEach((mk) => {
 		const usageCount = keys.filter(
-			(keyObj) => keyObj.encryptionHash === mk.hash).length;
+			(keyObj) => keyObj.masterKeyHash === mk.hash).length;
 		const tr = document.createElement("tr");
 		const tdMasterKey = document.createElement("td");
 		tdMasterKey.className = "master-key-cell";
@@ -668,7 +668,7 @@ function renderMasterKeysTable() {
 
 function updateAffectedKeys(deletedHash) {
 	keys.forEach((keyObj) => {
-		if (keyObj.encryptionHash === deletedHash) {
+		if (keyObj.masterKeyHash === deletedHash) {
 			keyObj.decryptedSecret = null;
 			const statusElement = document.getElementById(`status-${keyObj.id}`);
 			if (statusElement) {
@@ -716,7 +716,7 @@ function rendersecretKeysTable() {
 		});
 		tr.appendChild(tdKey);
 		const tdHash = document.createElement("td");
-		const hashToDisplay = window.innerWidth < 768 ? keyObj.encryptionHash.slice(0, 15) + "..." : keyObj.encryptionHash;
+		const hashToDisplay = window.innerWidth < 768 ? keyObj.masterKeyHash.slice(0, 15) + "..." : keyObj.masterKeyHash;
 		tdHash.textContent = hashToDisplay;
 		tr.appendChild(tdHash);
 		const tdActions = document.createElement("td");
@@ -752,7 +752,7 @@ function updatesecretKeysRevealButton() {
 // ================================
 
 function getMatchingMasterKey(keyObj) {
-	return masterKeys.find((mk) => mk.hash === keyObj.encryptionHash);
+	return masterKeys.find((mk) => mk.hash === keyObj.masterKeyHash);
 }
 
 async function updateKeyCard(keyObj) {
@@ -824,7 +824,7 @@ function prepareKey(keyObj, options = {}) {
         id: keyObj.id,
         accountName: keyObj.accountName || keyObj.title || "Unknown",
         encryptedKey: keyObj.encryptedKey,
-        encryptionHash: keyObj.encryptionHash,
+        masterKeyHash: keyObj.masterKeyHash || keyObj.encryptionHash,
         issuer: keyObj.issuer || "Unknown",
         digits: keyObj.digits || 6,
         period: keyObj.period || 30,
@@ -1190,7 +1190,7 @@ async function addKey(accountName, keyValue, masterKey, options = {}) {
         id: id,
         accountName: accountName,
         encryptedKey: encrypted,
-        encryptionHash: masterKey.hash,
+        masterKeyHash: masterKey.hash,
         issuer: options.issuer,
         digits: options.digits,
         period: options.period,
