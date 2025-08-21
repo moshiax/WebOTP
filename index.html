@@ -395,7 +395,11 @@ const keyCardTemplate = `
   <div class="public-values">
     <div class="title">
       <strong>Name:</strong>
-      <span class="editable-title" data-key-id="" contenteditable="true" spellcheck="false"></span>
+      <span class="account-name" data-key-id="" contenteditable="true" spellcheck="false"></span>
+    </div>
+    <div class="issuer" style="display:none;">
+      <strong>Issuer:</strong>
+      <span class="issuer-value"></span>
     </div>
     <div class="otp">
       <strong>OTP:</strong>
@@ -420,11 +424,11 @@ function createKeyCard(keyObj) {
     const delBtn = card.querySelector(".delete-btn");
     delBtn.onclick = () => deleteKey(keyObj);
 
-    const editableTitle = card.querySelector(".editable-title");
+    const editableTitle = card.querySelector(".account-name");
     editableTitle.textContent = keyObj.accountName || keyObj.title || "Unknown";
     editableTitle.dataset.keyId = keyObj.id;
     editableTitle.addEventListener("blur", function() {
-        const key = keys.find(keyObj => keyObj.id === this.dataset.keyId);
+        const key = keys.find(k => k.id === this.dataset.keyId);
         if (key) {
             const newTitle = this.textContent.trim();
             if (newTitle && newTitle !== (key.accountName || key.title)) {
@@ -444,6 +448,36 @@ function createKeyCard(keyObj) {
         }
     });
 
+    const issuerDiv = card.querySelector(".issuer");
+    const issuerSpan = card.querySelector(".issuer-value");
+    if (keyObj.issuer && keyObj.issuer !== "Unknown") {
+        issuerSpan.textContent = keyObj.issuer;
+        issuerDiv.style.display = "block";
+    } else {
+        issuerDiv.style.display = "none";
+    }
+
+    issuerSpan.contentEditable = true;
+    issuerSpan.spellcheck = false;
+    issuerSpan.dataset.keyId = keyObj.id;
+    issuerSpan.addEventListener("blur", function() {
+        const key = keys.find(k => k.id === this.dataset.keyId);
+        if (key) {
+            const newIssuer = this.textContent.trim();
+            if (newIssuer && newIssuer !== key.issuer) {
+                key.issuer = newIssuer;
+                saveKeys();
+                this.textContent = newIssuer;
+            }
+        }
+    });
+    issuerSpan.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            this.blur();
+        }
+    });
+
     const otpSpan = card.querySelector(".otp-value");
     otpSpan.id = "otp-" + keyObj.id;
     otpSpan.addEventListener("click", function() {
@@ -457,7 +491,7 @@ function createKeyCard(keyObj) {
     statusSpan.dataset.keyId = keyObj.id;
     statusSpan.addEventListener("click", async function() {
         const keyId = this.dataset.keyId;
-        const key = keys.find(keyObj => keyObj.id === keyId);
+        const key = keys.find(k => k.id === keyId);
         if (!key) return;
         const mk = getMatchingMasterKey(key);
         if (!mk) return;
@@ -491,31 +525,6 @@ function appendKeyCard(keyObj) {
 	const container = document.getElementById("keysContainer");
 	const keyCard = createKeyCard(keyObj);
 	container.appendChild(keyCard);
-}
-
-function attachEditableTitleListenerToCard(cardElement) {
-	const titleElem = cardElement.querySelector(".editable-title");
-	if (!titleElem) return;
-	titleElem.addEventListener("blur", function() {
-		const keyId = this.getAttribute("data-key-id");
-		const keyObj = keys.find((keyObj) => keyObj.id === keyId);
-		if (keyObj) {
-			const newTitle = this.textContent.trim();
-			if (newTitle && newTitle !== keyObj.title) {
-				keyObj.title = newTitle;
-				saveKeys();
-				if (document.getElementById("managesecretKeysModal").style.display !== "none") {
-					rendersecretKeysTable();
-				}
-			}
-		}
-	});
-	titleElem.addEventListener("keydown", function(e) {
-		if (e.key === "Enter") {
-			e.preventDefault();
-			this.blur();
-		}
-	});
 }
 
 function openModal(modalId, updateFunction) {
@@ -752,7 +761,7 @@ function getMatchingMasterKey(keyObj) {
 async function updateKeyCard(keyObj) {
     const otpSpan = document.getElementById("otp-" + keyObj.id);
     const statusSpan = document.getElementById("status-" + keyObj.id);
-    const titleSpan = document.querySelector(`.editable-title[data-key-id="${keyObj.id}"]`);
+    const titleSpan = document.querySelector(`.account-name[data-key-id="${keyObj.id}"]`);
 
     if (titleSpan) titleSpan.textContent = keyObj.accountName;
 
