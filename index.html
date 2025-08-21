@@ -82,25 +82,16 @@
 		</div>
 	  </div>
 	</div>
-    <div id="managesecretKeysModal" class="modal">
-      <div id="managesecretKeysModalContent" class="modal-content">
-        <span id="closeManagesecretKeysModal" class="close" onclick="closeModal('managesecretKeysModal');">&times;</span>
-        <h2 style="text-align: center;">Secret Keys</h2>
-        <table id="secretKeysTable">
-          <thead>
-            <tr>
-              <th>Key</th>
-              <th>Masterkey SHA256</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-        <div style="text-align: center; margin-top: 20px;">
-          <button id="toggleRevealsecretKeysBtn">Reveal secret keys</button>
-        </div>
-      </div>
-    </div>
+	<div id="managesecretKeysModal" class="modal">
+	  <div id="managesecretKeysModalContent" class="modal-content">
+		<span id="closeManagesecretKeysModal" class="close" onclick="closeModal('managesecretKeysModal');">&times;</span>
+		<h2 style="text-align: center;">Secret Keys</h2>
+		<table id="secretKeysTable">
+		  <thead></thead>
+		  <tbody></tbody>
+		</table>
+	  </div>
+	</div>
     <dialog id="customPromptDialog">
       <form method="dialog">
         <p id="customPromptText"></p>
@@ -681,70 +672,73 @@ function updateAffectedKeys(deletedHash) {
 }
 
 function rendersecretKeysTable() {
-	const tbody = document.querySelector("#secretKeysTable tbody");
-	tbody.innerHTML = "";
-	keys.forEach((keyObj, idx) => {
-		const tr = document.createElement("tr");
-		const tdKey = document.createElement("td");
-		tdKey.className = "master-key-cell";
-		if (secretKeysRevealed) {
-			tdKey.textContent = keyObj.decryptedSecret || "Encrypted";
-		} else {
-			tdKey.textContent = "Click to copy key";
-		}
-		tdKey.addEventListener("click", async function() {
-			const mk = getMatchingMasterKey(keyObj);
-			if (!keyObj.decryptedSecret && mk) {
-				try {
-					keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
-					await navigator.clipboard.writeText(keyObj.decryptedSecret);
-					alert("Key copied to clipboard!");
-					rendersecretKeysTable();
-				} catch (e) {
-					alert("Decryption or copy failed: " + e.message);
-				}
-			} else if (keyObj.decryptedSecret) {
-				try {
-					await navigator.clipboard.writeText(keyObj.decryptedSecret);
-					alert("Key copied to clipboard!");
-				} catch (e) {
-					alert("Copy failed: " + e.message);
-				}
-			} else {
-				alert("Master key not available to decrypt this key.");
-			}
-		});
-		tr.appendChild(tdKey);
-		const tdHash = document.createElement("td");
-		const hashToDisplay = window.innerWidth < 768 ? keyObj.masterKeyHash.slice(0, 15) + "..." : keyObj.masterKeyHash;
-		tdHash.textContent = hashToDisplay;
-		tr.appendChild(tdHash);
-		const tdActions = document.createElement("td");
-		const delBtn = document.createElement("button");
-		delBtn.textContent = "Delete";
-		delBtn.onclick = function() {
-			deleteKey(keyObj);
-		};
-		tdActions.appendChild(delBtn);
-		tr.appendChild(tdActions);
-		tbody.appendChild(tr);
-	});
-	updatesecretKeysRevealButton();
-}
+    const table = document.querySelector("#secretKeysTable");
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
 
-function updatesecretKeysRevealButton() {
-	let btn = document.getElementById("toggleRevealsecretKeysBtn");
-	if (!btn) {
-		btn = document.createElement("button");
-		btn.id = "toggleRevealsecretKeysBtn";
-		document.querySelector("#managesecretKeysModalContent").appendChild(btn);
-	}
-	btn.onclick = function() {
-		secretKeysRevealed = !secretKeysRevealed;
-		this.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
-		rendersecretKeysTable();
-	};
-	btn.textContent = secretKeysRevealed ? "Hide secret keys" : "Reveal secret keys";
+    const thead = table.querySelector("thead");
+    thead.innerHTML = "";
+    if (keys.length > 0) {
+        const headerRow = document.createElement("tr");
+        Object.keys(keys[0]).forEach(key => {
+            const th = document.createElement("th");
+            th.textContent = key;
+            headerRow.appendChild(th);
+        });
+        const thActions = document.createElement("th");
+        thActions.textContent = "Actions";
+        headerRow.appendChild(thActions);
+        thead.appendChild(headerRow);
+    }
+
+    keys.forEach(keyObj => {
+        const tr = document.createElement("tr");
+
+        for (const [key, value] of Object.entries(keyObj)) {
+            const td = document.createElement("td");
+            let displayValue = value;
+
+            if (key === "id" || key === "masterKeyHash") {
+                displayValue = String(value).slice(0, 8) + "...";
+            }
+
+            if (key === "encryptedKey") {
+                displayValue = "Click to copy";
+            }
+
+            td.textContent = displayValue;
+            td.addEventListener("click", async function() {
+                if (key === "encryptedKey") {
+                    const mk = getMatchingMasterKey(keyObj);
+                    if (!mk) {
+                        alert("Master key not available.");
+                        return;
+                    }
+                    try {
+                        const decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
+                        await navigator.clipboard.writeText(decryptedSecret);
+                        alert("Secret copied to clipboard!");
+                    } catch (e) {
+                        alert("Decryption failed: " + e.message);
+                    }
+                } else {
+                    await navigator.clipboard.writeText(String(value));
+                    alert("Value copied to clipboard!");
+                }
+            });
+
+            tr.appendChild(td);
+        }
+
+        const tdActions = document.createElement("td");
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Delete";
+        delBtn.onclick = () => deleteKey(keyObj);
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+    });
 }
 
 // ================================
@@ -752,12 +746,16 @@ function updatesecretKeysRevealButton() {
 // ================================
 
 function getMatchingMasterKey(keyObj) {
-	return masterKeys.find((mk) => mk.hash === keyObj.masterKeyHash);
+    return masterKeys.find(mk => mk.hash === keyObj.masterKeyHash);
 }
 
 async function updateKeyCard(keyObj) {
     const otpSpan = document.getElementById("otp-" + keyObj.id);
     const statusSpan = document.getElementById("status-" + keyObj.id);
+    const titleSpan = document.querySelector(`.editable-title[data-key-id="${keyObj.id}"]`);
+
+    if (titleSpan) titleSpan.textContent = keyObj.accountName;
+
     const mk = getMatchingMasterKey(keyObj);
 
     if (!mk) {
@@ -787,32 +785,20 @@ async function updateAllKeyCards() {
 	keys.forEach((keyObj) => updateKeyCard(keyObj));
 }
 
-async function updateDecryptionForKeys() {
-	if (masterKeys.length === 0) {
-		keys.forEach((keyObj) => (keyObj.status = "encrypted"));
-		return;
-	}
-	for (const keyObj of keys) {
-		const mk = getMatchingMasterKey(keyObj);
-		if (mk) {
-			if (keyObj.decryptedSecret) {
-				keyObj.status = "decrypted";
-			} else {
-				keyObj.status = await decryptKey(keyObj, mk);
-			}
-		} else {
-			keyObj.status = "encrypted";
-		}
-	}
+function updateDecryptionForKeys() {
+    if (!masterKeys.length) {
+        keys.forEach(keyObj => keyObj.status = "encrypted");
+        return;
+    }
+
+    keys.forEach(keyObj => {
+        const mk = getMatchingMasterKey(keyObj);
+        keyObj.status = mk && keyObj.masterKeyHash === mk.hash ? "decrypted" : mk ? "failed" : "encrypted";
+    });
 }
 
-async function decryptKey(keyObj, mk) {
-	try {
-		keyObj.decryptedSecret = await decryptText(keyObj.encryptedKey, mk.password);
-		return "decrypted";
-	} catch {
-		return "failed";
-	}
+function decryptKey(keyObj, mk) {
+    return keyObj.masterKeyHash === mk.hash ? "decrypted" : "encrypted";
 }
 
 // ================================
@@ -914,47 +900,54 @@ async function processImport(input) {
             combined = JSON.parse(await decryptText(input, password));
         }
     } catch (e) {
+        console.error("Failed to parse/import data:", e);
         alert("Failed to import data: " + e.message);
         return;
     }
 
     try {
-        if (combined.keys) mergeImportedKeys(combined.keys.map(k => prepareKey(k, { shortImport: false })));
-        mergeImportedMasterKeys(combined.masterKeys);
-        saveKeys();
-        await saveMasterKeys();
-        await updateDecryptionForKeys();
-        renderKeys();
-        updateAllKeyCards();
-        alert("Data imported successfully!");
+        let newKeys = combined.keys ? combined.keys.map(k => prepareKey(k, { shortImport: false })) : [];
+
+        newKeys.forEach(newKey => {
+            const existingKey = keys.find(k => k.id === newKey.id);
+            if (existingKey) {
+                if (existingKey.accountName !== newKey.accountName) {
+                    existingKey.accountName = newKey.accountName;
+                    updateKeyCard(existingKey).catch(err => console.error(`Error updating key card id=${existingKey.id}:`, err));
+                }
+            } else {
+                keys.push(newKey);
+                appendKeyCard(newKey);
+            }
+        });
+
+        await saveKeys();
+
+        if (combined.masterKeys) {
+            let addedAnyMasterKey = false;
+
+            for (const mk of combined.masterKeys) {
+                if (!masterKeys.some(existing => existing.hash === mk.hash)) {
+                    masterKeys.push(mk);
+                    addedAnyMasterKey = true;
+                }
+            }
+
+            if (addedAnyMasterKey) {
+                await saveMasterKeys();
+
+                keys.forEach(keyObj => {
+                    const mkMatch = masterKeys.some(mk => mk.hash === keyObj.masterKeyHash);
+                    if (mkMatch) {
+                        updateKeyCard(keyObj).catch(err => console.error(`Error updating key card id=${keyObj.id}:`, err));
+                    }
+                });
+            }
+        }
     } catch (e) {
+        console.error("Error processing imported data:", e);
         alert("Error processing imported data: " + e.message);
     }
-}
-
-function mergeImportedKeys(importedKeys) {
-	if (importedKeys) {
-		importedKeys.forEach((newKey) => {
-			const existingKey = keys.find((keyObj) => keyObj.id === newKey.id);
-			if (existingKey) {
-				if (existingKey.accountName !== newKey.accountName) {
-					existingKey.accountName = newKey.accountName;
-				}
-			} else {
-				keys.push(newKey);
-			}
-		});
-	}
-}
-
-function mergeImportedMasterKeys(importedMasterKeys) {
-	if (importedMasterKeys) {
-		importedMasterKeys.forEach((newMk) => {
-			if (!masterKeys.find((mk) => mk.hash === newMk.hash)) {
-				masterKeys.push(newMk);
-			}
-		});
-	}
 }
 
 // ================================
@@ -1257,56 +1250,59 @@ async function chooseMasterKey() {
 }
 
 async function addMasterKey() {
-	const input = await prompt("Enter master key:", 1);
-	if (!input) return;
-	const hash = await sha256(input);
-	if (masterKeys.some((mk) => mk.hash === hash)) {
-		alert("Master key already added");
-		return;
-	}
-	masterKeys.push({
-		password: input,
-		hash: hash,
-	});
-	await saveMasterKeys();
-	await updateDecryptionForKeys();
-	renderKeys();
-	await updateAllKeyCards();
-	updateEncButton();
-	if (document.getElementById("manageMasterModal").style.display !== "none") {
-		renderMasterKeysTable();
-	}
+    const input = await prompt("Enter master key:", 1);
+    if (!input) return;
+
+    const hash = await sha256(input);
+    if (masterKeys.some(mk => mk.hash === hash)) {
+        alert("Master key already added");
+        return;
+    }
+
+    masterKeys.push({ password: input, hash: hash });
+    await saveMasterKeys();
+
+    keys.forEach(keyObj => {
+        if (keyObj.masterKeyHash === hash) {
+            updateKeyCard(keyObj);
+        }
+    });
+
+    updateEncButton();
+    if (document.getElementById("manageMasterModal").style.display !== "none") {
+        renderMasterKeysTable();
+    }
 }
 
 function startOTPUpdater() {
-	const now = Date.now();
-	const nextUpdate = 30000 - (now % 30000);
-	updateAllKeyCards();
-	setTimeout(() => {
-		updateAllKeyCards();
-		setInterval(updateAllKeyCards, 30000);
-	}, nextUpdate);
-}
+    function update() {
+        const now = Date.now();
 
-function updateProgressLines() {
-  const now = Date.now();
-  document.querySelectorAll(".progress-fill").forEach(e => {
-    if (!e.offsetParent) return;
+        document.querySelectorAll(".key-card").forEach(card => {
+            const cardId = card.id.replace(/^key-/, "");
+            const keyObj = keys.find(k => k.id === cardId);
+            if (!keyObj) return;
 
-    const periodSec = parseFloat(e.dataset.period);
-    if (!periodSec) {
-      if (!e.dataset.warned) {
-        console.warn("Progressline has invalid period:", e.dataset.period, e);
-        e.dataset.warned = "1";
-      }
-      return;
+            const progressEl = card.querySelector(".progress-fill");
+            const periodSec = progressEl ? parseFloat(progressEl.dataset.period) || 30 : 30;
+            const periodMs = periodSec * 1000;
+
+            const timeStep = Math.floor(now / periodMs);
+            if (parseInt(card.dataset.lastStep) !== timeStep) {
+                updateKeyCard(keyObj);
+                card.dataset.lastStep = timeStep;
+            }
+
+            if (progressEl) {
+                const elapsed = (now % periodMs) / periodMs;
+                progressEl.style.width = (elapsed * 100) + "%";
+            }
+        });
+
+        requestAnimationFrame(update);
     }
 
-    const periodMs = periodSec * 1000;
-    e.style.width = (now % periodMs) / periodMs * 100 + "%";
-  });
-
-  requestAnimationFrame(updateProgressLines);
+    update();
 }
 
 async function init() {
@@ -1314,7 +1310,6 @@ async function init() {
 	await loadMasterKeys();
 	renderKeys();
 	startOTPUpdater();
-	requestAnimationFrame(updateProgressLines);
 	initEventListeners();
 }
 document.addEventListener("DOMContentLoaded", init);
