@@ -815,12 +815,20 @@ function decryptKey(keyObj, mk) {
 // ================================
 
 function prepareKey(keyObj, options = {}) {
+    let accountName = keyObj.accountName || keyObj.title || "Unknown";
+    let issuer = keyObj.issuer || "Unknown";
+
+	if (issuer && accountName.startsWith(issuer + ":")) {
+		accountName = accountName.slice((issuer + ":").length);
+	}
+	accountName = accountName.trim();
+
     const KeyObj = { 
         id: keyObj.id,
-        accountName: keyObj.accountName || keyObj.title || "Unknown",
+        accountName,
         encryptedKey: keyObj.encryptedKey,
         masterKeyHash: keyObj.masterKeyHash || keyObj.encryptionHash,
-        issuer: keyObj.issuer || "Unknown",
+        issuer,
         digits: keyObj.digits || 6,
         period: keyObj.period || 30,
         algorithm: keyObj.algorithm || "SHA1"
@@ -1102,14 +1110,12 @@ function parseQRCode(image) {
 }
 
 function parseQRCodeFromText(qrText, masterKey) {
-    console.log("Parsing QR code:", qrText);
 
     if (qrText.startsWith('otpauth-migration://')) {
         const urlObj = new URL(qrText);
         let dataParam = urlObj.searchParams.get('data');
         if (dataParam) {
             dataParam = decodeURIComponent(dataParam);
-            console.log("Detected otpauth-migration, data parameter decoded.");
             parseOtpauthMigration(dataParam, masterKey);
         }
         return;
@@ -1126,29 +1132,25 @@ function parseQRCodeFromText(qrText, masterKey) {
     const remainingText = decodedQRText.slice(prefix.length);
 
     const [path, queryString] = remainingText.split('?');
-    if (!queryString) {
-        console.warn('No query string found in QR code. Full remaining text:', remainingText);
-        alert('Invalid QR code format: Missing query parameters.');
-        return;
-    }
 
-    let accountName = path.replace(':', ': ');
     const urlParams = new URLSearchParams(queryString);
-
-    const keyValue = urlParams.get('secret');
-    if (!keyValue) {
-        console.warn('Secret not found in QR code query string:', queryString);
-        alert('Invalid QR code: secret missing.');
-        return;
-    }
-
+	const secret = urlParams.get('secret');
     const issuer = urlParams.get('issuer') || '';
     const digits = parseInt(urlParams.get('digits')) || 6;
     const period = parseInt(urlParams.get('period')) || 30;
     const algorithm = urlParams.get('algorithm') || 'SHA1';
 
-    addKeyUI(accountName, keyValue, { issuer, digits, period, algorithm });
+    const keyOptions = prepareKey({
+        accountName: path,
+        issuer,
+        digits,
+        period,
+        algorithm
+    }, { shortImport: true });
+
+    addKeyUI(path, secret, keyOptions);
 }
+
 
 function parseOtpauthMigration(dataParam, masterKey) {
     try {
@@ -1159,24 +1161,20 @@ function parseOtpauthMigration(dataParam, masterKey) {
         const payload = MigrationPayload.decode(bytes);
         const object = MigrationPayload.toObject(payload, { longs: String, enums: String, bytes: String, defaults: true });
 
-        object.otpParameters.forEach((param, index) => {
-            let accountName = param.name || '';
-            const issuer = param.issuer || '';
-
-            const issuerInName = issuer && accountName.startsWith(issuer + ":");
-
-            if (issuerInName) {
-                accountName = accountName.slice((issuer + ":").length).trim();
-            }
-
+        object.otpParameters.forEach((param) => {
             const base32Secret = base64ToBase32(param.secret);
-            addKeyUI(accountName, base32Secret, {
-                issuer,
-                digits: 6, // Google Authenticator export sets "digits" to random shit like 2
-                period: param.period || 30,
-                algorithm: param.algorithm || 'SHA1'
-            });
+
+            const keyOptions = prepareKey({
+                accountName: param.name,
+                issuer: param.issuer,
+                digits: 6,
+                period: param.period,
+                algorithm: param.algorithm
+            }, { shortImport: false });
+
+            addKeyUI(param.name, base32Secret, keyOptions);
         });
+
     } catch (error) {
         console.error("Error parsing otpauth-migration:", error.message);
     }
