@@ -39,6 +39,32 @@ jobs:
       - name: Build webotp.html
         run: python build.py
 
+      - name: Clear releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASES_JSON=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases?per_page=100")
+
+          RELEASES=$(echo "$RELEASES_JSON" | jq -r '. | sort_by(.created_at) | reverse | .[] | "\(.id) \(.tag_name)"')
+
+          COUNT=0
+          for line in $RELEASES; do
+            COUNT=$((COUNT + 1))
+            if [ $COUNT -le 3 ]; then
+              continue
+            fi
+            RELEASE_ID=$(echo $line | cut -d' ' -f1)
+            TAG_NAME=$(echo $line | cut -d' ' -f2)
+            echo "Deleting release $TAG_NAME (id $RELEASE_ID) and tag $TAG_NAME"
+
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/$RELEASE_ID"
+
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/refs/tags/$TAG_NAME"
+          done
+
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
