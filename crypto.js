@@ -99,19 +99,18 @@ async function decryptText(encryptedData, password) {
 }
 
 async function generateOTP(keyObj) {
-
-    const digits = keyObj.digits
-    const period = keyObj.period
-	const algorithm = (() => {
-		switch (keyObj.algorithm) {
-			case "SHA1": return "SHA-1";
-			case "SHA256": return "SHA-256";
-			case "SHA512": return "SHA-512";
-			default:
-				console.error(`generateOTP: Unsupported algorithm "${keyObj.algorithm}"`);
-				throw new Error("Unsupported algorithm");
-		}
-	})();
+    const digits = keyObj.digits;
+    const period = keyObj.period;
+    const algorithm = (() => {
+        switch (keyObj.algorithm) {
+            case "SHA1": return "SHA-1";
+            case "SHA256": return "SHA-256";
+            case "SHA512": return "SHA-512";
+            default:
+                console.error(`generateOTP: Unsupported algorithm "${keyObj.algorithm}"`);
+                throw new Error("Unsupported algorithm");
+        }
+    })();
 
     const epoch = Math.floor(Date.now() / 1000);
     const counter = BigInt(Math.floor(epoch / period));
@@ -131,12 +130,15 @@ async function generateOTP(keyObj) {
     const hmac = await crypto.subtle.sign('HMAC', cryptoKey, buffer);
     const hmacBytes = new Uint8Array(hmac);
     const offset = hmacBytes[hmacBytes.length - 1] & 0xf;
-    const binary = ((hmacBytes[offset] & 0x7f) << 24) |
-                   ((hmacBytes[offset + 1] & 0xff) << 16) |
-                   ((hmacBytes[offset + 2] & 0xff) << 8) |
-                   (hmacBytes[offset + 3] & 0xff);
 
-    const otp = (BigInt(Number(binary)) % 10n ** BigInt(Number(digits))).toString().padStart(Number(digits), '0');
+    const binary = 
+        (BigInt(hmacBytes[offset] & 0x7f) << 24n) |
+        (BigInt(hmacBytes[offset + 1] & 0xff) << 16n) |
+        (BigInt(hmacBytes[offset + 2] & 0xff) << 8n) |
+        BigInt(hmacBytes[offset + 3] & 0xff);
+
+    const otp = (binary % 10n ** BigInt(digits)).toString().padStart(digits, '0');
+
     return otp;
 }
 
