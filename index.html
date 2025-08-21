@@ -220,12 +220,12 @@ function loadKeys() {
 }
 
 function mergeKeys(fromUrl) {
-	for (const keyObj of fromUrl) {
-		if (!keys.find((keyObj) => keyObj.id === keyObj.id)) {
-			keys.push(keyObj);
-		}
-	}
-	localStorage.setItem("authKeys", JSON.stringify(keys));
+    for (const keyObj of fromUrl) {
+        if (!keys.find((k) => k.id === keyObj.id)) {
+            keys.push(keyObj);
+        }
+    }
+    localStorage.setItem("authKeys", JSON.stringify(keys));
 }
 
 function saveKeys() {
@@ -374,7 +374,7 @@ function updateMasterEncryptionControls() {
 
 function deleteKey(keyObj) {
 	if (confirm("Are you sure you want to delete this key?")) {
-		keys = keys.filter((keyObj) => keyObj.id !== keyObj.id);
+		keys = keys.filter((k) => k.id !== keyObj.id);
 		saveKeys();
 		const cardToDelete = document.getElementById("key-" + keyObj.id);
 		if (cardToDelete) {
@@ -1140,12 +1140,6 @@ function parseQRCodeFromText(qrText, masterKey) {
         accountName = `${issuer}: ${accountName}`;
     }
 
-    console.log("Adding key via UI:", {
-        accountName,
-        keyValue,
-        options: { issuer, digits, period, algorithm }
-    });
-
     addKeyUI(accountName, keyValue, { issuer, digits, period, algorithm });
 }
 
@@ -1159,15 +1153,15 @@ function parseOtpauthMigration(dataParam, masterKey) {
         const object = MigrationPayload.toObject(payload, { longs: String, enums: String, bytes: String, defaults: true });
 
         object.otpParameters.forEach(param => {
-            let accountName = param.name;
+            const accountNameOriginal = param.name || '';
             const issuer = param.issuer || '';
-            if (issuer && !accountName.includes(issuer)) {
-                accountName = `${issuer}: ${accountName}`;
-            }
+            const accountName = issuer && !accountNameOriginal.includes(issuer)
+                ? `${issuer}: ${accountNameOriginal}`
+                : accountNameOriginal;
 
             addKeyUI(accountName, param.secret, {
                 issuer,
-                digits: param.digits || 6,
+                digits: 6, // Google Authenticator export sets "digits" to random shit like 2
                 period: param.period || 30,
                 algorithm: param.algorithm || 'SHA1'
             });
