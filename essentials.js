@@ -34,8 +34,7 @@ function updateURL() {
 function getKeysFromURL() {
     if (window.location.hash.startsWith("#keys=")) {
         try {
-            const rawKeys = JSON.parse(base64DecodeUnicode(window.location.hash.substring(6)));
-            return rawKeys.map(k => prepareKey(k, { shortImport: false }));
+            return JSON.parse(base64DecodeUnicode(window.location.hash.substring(6)));
         } catch (e) {
             console.error("Error reading keys from URL:", e);
         }

@@ -131,7 +131,6 @@
 <script src="external/jsQR.js"></script>
 <script src="external/protobuf.js"></script>
 <script>
-console.log("Full URL:", window.location.href);
 
 if (window.location.href.includes('eruda=true')) {
     console.log("Eruda detected in URL, injecting...");
@@ -204,11 +203,14 @@ function loadKeys() {
         if (fromUrl) {
             fromUrl.forEach(fk => {
                 const exists = keys.find(k => k.id === fk.id);
-                if (!exists) keys.push(fk);
+                if (!exists) keys.push(prepareKey(fk));
             });
         }
+
+        keys = keys.map(k => prepareKey(k));
+
     } else if (fromUrl) {
-        keys = fromUrl;
+        keys = fromUrl.map(k => prepareKey(k));
     } else {
         keys = [];
     }
