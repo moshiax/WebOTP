@@ -136,7 +136,7 @@ async function generateOTP(keyObj) {
                    ((hmacBytes[offset + 2] & 0xff) << 8) |
                    (hmacBytes[offset + 3] & 0xff);
 
-    const otp = (BigInt(binary) % 10n ** BigInt(digits)).toString().padStart(digits, '0');
+    const otp = (BigInt(Number(binary)) % 10n ** BigInt(Number(digits))).toString().padStart(Number(digits), '0');
     return otp;
 }
 
