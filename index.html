@@ -1210,11 +1210,17 @@ async function addKeyUI(title = null, keyValue = null, options = {}) {
   if (!selectedMasterKey) return;
 
   try {
+    const id = await sha256(title + keyValue);
+
+    if (keys.find(k => k.id === id)) {
+      alert(`Key ${title} already imported!`);
+      return;
+    }
+
     const keyObj = await addKey(title, keyValue, selectedMasterKey, options);
     appendKeyCard(keyObj);
     updateKeyCard(keyObj);
     closeModal('addKeyUIModal');
-    console.log("Added key via UI:", keyObj);
   } catch (e) {
     alert("Error encrypting key: " + e.message);
   }
