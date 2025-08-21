@@ -768,8 +768,10 @@ async function updateKeyCard(keyObj) {
     }
 
     try {
-        keyObj.secret = await decryptText(keyObj.encryptedKey, mk.password);
-        const otp = await generateOTP(keyObj);
+        const otp = await generateOTP({
+            ...keyObj,
+            secret: await decryptText(keyObj.encryptedKey, mk.password)
+        });
         otpSpan.textContent = otp;
         statusSpan.textContent = "Decrypted";
         statusSpan.className = "status status-decrypted";
