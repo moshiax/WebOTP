@@ -59,11 +59,22 @@ self.addEventListener('fetch', (event) => {
           console.log(`Served from cache: ${request.url}`);
           return cacheResponse;
         }
-        console.warn(`No cache for: ${request.url}, returning 503`);
-        return new Response('Offline mode: no cached data', {
-          status: 503,
-          statusText: 'Service Unavailable',
-        });
+        console.warn(`No cache for: ${request.url}, serving offline page`);
+        const html = `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Offline Mode</title>
+          </head>
+          <body>
+            <h1>Offline Mode Active</h1>
+            <p>No cached data available for this page.</p>
+            <button onclick="if(prompt('Type yes to confirm disabling offline mode')?.toLowerCase()==='yes') { navigator.serviceWorker.controller.postMessage({type:'SET_OFFLINE_MODE',value:false}); location.reload(); }">Disable Offline Mode</button>
+          </body>
+          </html>
+        `;
+        return new Response(html, { status: 200, headers: { 'Content-Type': 'text/html' } });
       } else {
         try {
           const response = await fetch(request);

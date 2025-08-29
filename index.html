@@ -162,6 +162,11 @@ for (let key in settings) {
 }
 config.load();
 
+navigator.serviceWorker?.controller?.postMessage({
+    type: 'SET_OFFLINE_MODE',
+    value: config.get('offlineMode')
+});
+
 // ================================
 // localStorage management
 // ================================
