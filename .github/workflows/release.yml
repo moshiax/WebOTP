@@ -41,7 +41,7 @@ jobs:
         run: python build.py
 
       - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@b7eabc95ff50cbeeedec83973935c8f306dfcd0b
         with:
           tag: ${{ env.SHORT_SHA }}
           name: "Release ${{ env.SHORT_SHA }} - ${{ env.COMMIT_SUMMARY }}"
