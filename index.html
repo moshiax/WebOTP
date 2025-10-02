@@ -120,7 +120,6 @@
 <script src="crypto.js"></script>
 <script src ="essentials.js"></script>
 <script src="external/jsQR.js"></script>
-<script src="external/protobuf.js"></script>
 <script>
 const settings = {
 	passwordHideOn: {
@@ -1078,7 +1077,7 @@ function scanQRCode() {
 		const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 		const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
 		if (qrCode) {
-			parseQRCodeFromText(qrCode.data);
+			addKeyFromQRText(qrCode.data);
 			closeModal("qrScannerModal");
 		}
 	}
@@ -1095,20 +1094,20 @@ function parseQRCode(image) {
 	const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 	const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
 	if (qrCode) {
-		parseQRCodeFromText(qrCode.data);
+		addKeyFromQRText(qrCode.data);
 	} else {
 		alert('QR code not found.');
 	}
 }
 
-function parseQRCodeFromText(qrText, masterKey) {
+function addKeyFromQRText(qrText) {
 
 	if (qrText.startsWith('otpauth-migration://')) {
 		const urlObj = new URL(qrText);
 		let dataParam = urlObj.searchParams.get('data');
 		if (dataParam) {
 			dataParam = decodeURIComponent(dataParam);
-			parseOtpauthMigration(dataParam, masterKey);
+			parseOtpauthMigration(dataParam);
 		}
 		return;
 	}
@@ -1143,19 +1142,109 @@ function parseQRCodeFromText(qrText, masterKey) {
 	addKeyUI(path, secret, keyOptions);
 }
 
+const protoDefinition = {
+	MigrationPayload: {
+		fields: {
+			otp_parameters: { type: "OtpParameters", repeated: true, id: 1 },
+			version: { type: "int32", id: 2 },
+			batch_size: { type: "int32", id: 3 },
+			batch_index: { type: "int32", id: 4 },
+			omitted_values: { type: "int32", id: 5 }
+		}
+	},
+	OtpParameters: {
+		fields: {
+			secret: { type: "bytes", id: 1 },
+			name: { type: "string", id: 2 },
+			issuer: { type: "string", id: 3 },
+			type: { type: "OtpType", id: 4 },
+			algorithm: { type: "Algorithm", id: 5 },
+			digits: { type: "int32", id: 6 },
+			counter: { type: "int64", id: 7 }
+		}
+	},
+	OtpType: {
+		0: "OTP_TYPE_UNSPECIFIED",
+		1: "TOTP",
+		2: "HOTP"
+	},
+	Algorithm: {
+		0: "ALGORITHM_UNSPECIFIED",
+		1: "SHA1",
+		2: "SHA256",
+		3: "SHA512",
+		4: "MD5"
+	}
+};
 
-function parseOtpauthMigration(dataParam, masterKey) {
+function parseMigrationPayload(bytes) {
+	const readVarint = (buf, offset) => {
+		let val = 0, shift = 0, pos = offset;
+		while (true) {
+			const b = buf[pos++];
+			val |= (b & 0x7f) << shift;
+			if (!(b & 0x80)) break;
+			shift += 7;
+		}
+		return { value: val, length: pos - offset };
+	};
+
+	const tryText = u => { try { return new TextDecoder().decode(u); } catch { return null; } };
+	const parseEnum = (e, v) => e[v] ?? v;
+
+	const otpFields = protoDefinition.OtpParameters.fields;
+
+	let pos = 0, payload = { otpParameters: [] };
+
+	while (pos < bytes.length) {
+		const { value: keyVal, length: keyLen } = readVarint(bytes, pos); pos += keyLen;
+		const field = keyVal >> 3, wireType = keyVal & 0x7;
+
+		if (wireType === 0) {
+			const { value, length } = readVarint(bytes, pos); pos += length;
+			payload[field] = value;
+		} else if (wireType === 2) {
+			const { value: len, length: lenLen } = readVarint(bytes, pos); pos += lenLen;
+			const slice = bytes.slice(pos, pos + len); pos += len;
+			if (field === 1) {
+				let ipos = 0, param = {};
+				while (ipos < slice.length) {
+					const { value: k, length: kl } = readVarint(slice, ipos); ipos += kl;
+					const f = k >> 3, wt = k & 0x7;
+					const fieldDef = Object.entries(otpFields).find(([name, def]) => def.id === f);
+					if (!fieldDef) { ipos += wt === 2 ? readVarint(slice, ipos).value : 0; continue; }
+
+					const [name, def] = fieldDef;
+
+					if (wt === 0) {
+						const { value, length } = readVarint(slice, ipos); ipos += length;
+						if (def.type === "OtpType") param[name] = parseEnum(protoDefinition.OtpType, value);
+						else if (def.type === "Algorithm") param[name] = parseEnum(protoDefinition.Algorithm, value);
+						else param[name] = value;
+					} else if (wt === 2) {
+						const { value: l, length: ll } = readVarint(slice, ipos); ipos += ll;
+						const s = slice.slice(ipos, ipos + l); ipos += l;
+						if (def.type === "string") param[name] = tryText(s);
+						else param[name] = s;
+					} else break;
+				}
+				payload.otpParameters.push(param);
+			}
+		} else break;
+	}
+
+	return payload;
+}
+
+function parseOtpauthMigration(dataParam) {
 	try {
 		if (!dataParam) throw new Error("data parameter is empty");
 		const bytes = base64ToUint8Array(dataParam);
-		const root = protobuf.parse(protoDefinition).root;
-		const MigrationPayload = root.lookupType("migration.MigrationPayload");
-		const payload = MigrationPayload.decode(bytes);
-		const object = MigrationPayload.toObject(payload, { longs: String, enums: String, bytes: String, defaults: true });
+		const payload = parseMigrationPayload(bytes);
 
-		object.otpParameters.forEach((param) => {
-			const base32Secret = base64ToBase32(param.secret);
-
+		payload.otpParameters.forEach((param) => {
+			if (!param.secret) return;
+			const base32Secret = base64ToBase32(btoa(String.fromCharCode(...param.secret)));
 			const keyOptions = prepareKey({
 				accountName: param.name,
 				issuer: param.issuer,
@@ -1252,7 +1341,6 @@ async function addMasterKey() {
 
 	const hash = await sha256(input);
 	if (masterKeys.some(mk => mk.hash === hash)) {
-		alert("Master key already added");
 		return;
 	}
 
