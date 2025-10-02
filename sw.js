@@ -15,7 +15,6 @@ self.addEventListener('install', (event) => {
         'crypto.js',
         'essentials.js',
         'external/jsQR.js',
-        'external/protobuf.js',
         'manifest.json',
         'icon.png',
         'demo.png',
