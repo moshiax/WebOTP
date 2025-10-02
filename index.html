@@ -1143,13 +1143,13 @@ function addKeyFromQRText(qrText) {
 }
 
 const protoDefinition = {
-	MigrationPayload: {
+	Payload: {
 		fields: {
 			otp_parameters: { type: "OtpParameters", repeated: true, id: 1 },
 			version: { type: "int32", id: 2 },
 			batch_size: { type: "int32", id: 3 },
 			batch_index: { type: "int32", id: 4 },
-			omitted_values: { type: "int32", id: 5 }
+			batch_id: { type: "int32", id: 5 }
 		}
 	},
 	OtpParameters: {
@@ -1157,16 +1157,17 @@ const protoDefinition = {
 			secret: { type: "bytes", id: 1 },
 			name: { type: "string", id: 2 },
 			issuer: { type: "string", id: 3 },
-			type: { type: "OtpType", id: 4 },
-			algorithm: { type: "Algorithm", id: 5 },
-			digits: { type: "int32", id: 6 },
-			counter: { type: "int64", id: 7 }
+			algorithm: { type: "Algorithm", id: 4 },
+			digits: { type: "DigitCount", id: 5 },
+			type: { type: "OtpType", id: 6 },
+			counter: { type: "uint64", id: 7 },
+			unique_id: { type: "string", id: 8 }
 		}
 	},
 	OtpType: {
 		0: "OTP_TYPE_UNSPECIFIED",
-		1: "TOTP",
-		2: "HOTP"
+		1: "HOTP",
+		2: "TOTP"
 	},
 	Algorithm: {
 		0: "ALGORITHM_UNSPECIFIED",
@@ -1174,6 +1175,11 @@ const protoDefinition = {
 		2: "SHA256",
 		3: "SHA512",
 		4: "MD5"
+	},
+	DigitCount: {
+		0: "DIGIT_COUNT_UNSPECIFIED",
+		1: "6",
+		2: "8"
 	}
 };
 
@@ -1220,6 +1226,7 @@ function parseMigrationPayload(bytes) {
 						const { value, length } = readVarint(slice, ipos); ipos += length;
 						if (def.type === "OtpType") param[name] = parseEnum(protoDefinition.OtpType, value);
 						else if (def.type === "Algorithm") param[name] = parseEnum(protoDefinition.Algorithm, value);
+						else if (def.type === "DigitCount") param[name] = parseEnum(protoDefinition.DigitCount, value);
 						else param[name] = value;
 					} else if (wt === 2) {
 						const { value: l, length: ll } = readVarint(slice, ipos); ipos += ll;
@@ -1248,7 +1255,7 @@ function parseOtpauthMigration(dataParam) {
 			const keyOptions = prepareKey({
 				accountName: param.name,
 				issuer: param.issuer,
-				digits: 6,
+				digits: param.digits,
 				period: param.period,
 				algorithm: param.algorithm
 			}, { shortImport: false });
