@@ -42,13 +42,27 @@ body {
 
 header {
   background-color: var(--color-background-lighter);
-  padding: var(--padding-medium);
+  padding: var(--padding-medium) 0 0.1% 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   position: sticky;
   top: 0;
   z-index: 1000;
+}
+
+#key-search {
+  display: block;
+  margin: 0 auto;
+  margin-bottom: 5px;
+  max-width: 90%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media not (display-mode: standalone) {
+  #key-search {
+    display: none;
+  }
 }
 
 header h1 { margin: 0; }
@@ -273,13 +287,6 @@ input {
 button:hover, .left:hover, .right:hover {
   filter: brightness(1.2);
   transition: filter 0.25s ease;
-}
-
-#encControls {
-  margin-top: 10px;
-
-  span { font-weight: bold; margin-right: 10px; }
-  button { margin-right: 5px; }
 }
 
 .close {

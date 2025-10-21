@@ -10,8 +10,7 @@
   </head>
   <body>
 	<header>
-	  <h1>WebOTP</h1>
-	  <div id="encControls"></div>
+	  <input type="search" id="key-search" placeholder="Search..." oninput="filterKeyCards(this.value)">
 	</header>
 	<main>
 <div id="keysContainer"></div>
@@ -226,7 +225,6 @@ async function loadMasterKeys() {
 		masterKeys = [];
 		sessionEncKey = null;
 		updateURL();
-		updateEncButton();
 		return;
 	}
 
@@ -267,7 +265,6 @@ async function loadMasterKeys() {
 		sessionEncKey = null;
 	}
 	updateURL();
-	updateEncButton();
 }
 
 async function saveMasterKeys() {
@@ -291,7 +288,6 @@ async function changeMasterKeysEncryptionKey() {
 	sessionEncKey = newKey;
 	await saveMasterKeys();
 	alert("Master keys encryption key successfully changed.");
-	updateEncButton();
 	updateMasterEncryptionControls();
 }
 async function enableMasterKeysEncryption() {
@@ -300,7 +296,6 @@ async function enableMasterKeysEncryption() {
 	sessionEncKey = newKey;
 	await saveMasterKeys();
 	alert("Master keys are now encrypted.");
-	updateEncButton();
 	updateMasterEncryptionControls();
 }
 async function disableMasterKeysEncryption() {
@@ -312,7 +307,6 @@ async function disableMasterKeysEncryption() {
 	masterKeys = decryptedKeys;
 	await saveMasterKeys();
 	alert("Encryption of master keys disabled.");
-	updateEncButton();
 	updateMasterEncryptionControls();
 }
 
@@ -320,18 +314,13 @@ async function disableMasterKeysEncryption() {
 // UI Functions
 // ================================
 
-function updateEncButton() {
-	const controlsDiv = document.getElementById("encControls");
-	controlsDiv.innerHTML = "";
-	const button = document.createElement("button");
-	if (sessionEncKey) {
-		button.style.display = "none";
-	} else {
-		button.textContent = "Master keys unencrypted!";
-		button.style.backgroundColor = "#d73a49";
-	}
-	button.addEventListener("click", openManageMasterModal);
-	controlsDiv.appendChild(button);
+function filterKeyCards(query) {
+  const q = query.trim().toLowerCase()
+  document.querySelectorAll('.key-card').forEach(card => {
+    const issuer = (card.querySelector('.issuer-value')?.textContent || '').toLowerCase()
+    const account = (card.querySelector('.account-name')?.textContent || '').toLowerCase()
+    card.style.display = (!q || issuer.includes(q) || account.includes(q)) ? 'block' : 'none'
+  })
 }
 
 function updateMasterEncryptionControls() {
@@ -344,6 +333,7 @@ function updateMasterEncryptionControls() {
 		container.appendChild(changeBtn);
 		const disableBtn = document.createElement("button");
 		disableBtn.textContent = "Disable encryption";
+		disableBtn.style.backgroundColor = "var(--color-red)";
 		disableBtn.addEventListener("click", disableMasterKeysEncryption);
 		container.appendChild(disableBtn);
 	} else {
@@ -985,7 +975,6 @@ function initEventListeners() {
 		loadKeys();
 		loadMasterKeys();
 		renderKeys();
-		updateEncButton();
 	});
 	window.addEventListener("click", function(event) {
 		const modals = [{
@@ -1360,7 +1349,6 @@ async function addMasterKey() {
 		}
 	});
 
-	updateEncButton();
 	if (document.getElementById("manageMasterModal").style.display !== "none") {
 		renderMasterKeysTable();
 	}
