@@ -116,8 +116,8 @@
 		</div>
 	  </div>
 	</div>
-<script src="crypto.js"></script>
 <script src ="essentials.js"></script>
+<script src="crypto.js"></script>
 <script src="external/jsQR.js"></script>
 <script>
 const settings = {
@@ -172,7 +172,6 @@ let masterKeys = [];
 let keys = [];
 let masterKeysRevealed = false;
 let sessionEncKey = null;
-let secretKeysRevealed = false;
 
 function loadKeys() {
 	let fromUrl = getKeysFromURL();
@@ -198,15 +197,6 @@ function loadKeys() {
 
 	localStorage.setItem("authKeys", JSON.stringify(keys));
 	updateURL();
-}
-
-function mergeKeys(fromUrl) {
-	for (const keyObj of fromUrl) {
-		if (!keys.find((k) => k.id === keyObj.id)) {
-			keys.push(keyObj);
-		}
-	}
-	localStorage.setItem("authKeys", JSON.stringify(keys));
 }
 
 function saveKeys() {
@@ -317,9 +307,9 @@ async function disableMasterKeysEncryption() {
 function filterKeyCards(query) {
   const q = query.trim().toLowerCase()
   document.querySelectorAll('.key-card').forEach(card => {
-    const issuer = (card.querySelector('.issuer-value')?.textContent || '').toLowerCase()
-    const account = (card.querySelector('.account-name')?.textContent || '').toLowerCase()
-    card.style.display = (!q || issuer.includes(q) || account.includes(q)) ? 'block' : 'none'
+	const issuer = (card.querySelector('.issuer-value')?.textContent || '').toLowerCase()
+	const account = (card.querySelector('.account-name')?.textContent || '').toLowerCase()
+	card.style.display = (!q || issuer.includes(q) || account.includes(q)) ? 'block' : 'none'
   })
 }
 
@@ -401,6 +391,7 @@ function createKeyCard(keyObj) {
 	template.innerHTML = keyCardTemplate.trim();
 	const card = template.content.firstElementChild.cloneNode(true);
 	card.id = "key-" + keyObj.id;
+	otpObserver.observe(card);
 
 	const delBtn = card.querySelector(".delete-btn");
 	delBtn.onclick = () => deleteKey(keyObj);
@@ -496,10 +487,13 @@ function createKeyCard(keyObj) {
 function renderKeys() {
 	const container = document.getElementById("keysContainer");
 	container.innerHTML = "";
-	keys.forEach((keyObj) => {
+	const fragment = document.createDocumentFragment();
+	keys.forEach(keyObj => {
 		const card = createKeyCard(keyObj);
-		container.appendChild(card);
+		fragment.appendChild(card);
 	});
+
+	container.appendChild(fragment);
 }
 
 function appendKeyCard(keyObj) {
@@ -769,10 +763,6 @@ async function updateKeyCard(keyObj) {
 		statusSpan.className = "status status-failed";
 		console.error(`Error decrypting keyObj id=${keyObj.id}:`, err);
 	}
-}
-
-async function updateAllKeyCards() {
-	keys.forEach((keyObj) => updateKeyCard(keyObj));
 }
 
 function updateDecryptionForKeys() {
@@ -1354,13 +1344,31 @@ async function addMasterKey() {
 	}
 }
 
+const visibleCards = new Set();
+const otpObserver = new IntersectionObserver((entries) => {
+	entries.forEach(entry => {
+		const cardId = entry.target.id;
+		if (entry.isIntersecting) {
+			visibleCards.add(cardId);
+		} else {
+			visibleCards.delete(cardId);
+		}
+	});
+}, {
+	root: null,
+	rootMargin: '50% 0% 50% 0%',
+	threshold: 0
+});
+
 function startOTPUpdater() {
 	function update() {
 		const now = Date.now();
 
-		document.querySelectorAll(".key-card").forEach(card => {
-			const cardId = card.id.replace(/^key-/, "");
-			const keyObj = keys.find(k => k.id === cardId);
+		visibleCards.forEach(cardId => {
+			const card = document.getElementById(cardId);
+			if (!card) return;
+
+			const keyObj = keys.find(k => k.id === cardId.replace(/^key-/, ""));
 			if (!keyObj) return;
 
 			const progressEl = card.querySelector(".progress-fill");

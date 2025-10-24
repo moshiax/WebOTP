@@ -1,5 +1,42 @@
 // crypto.js
 
+function serializeArg(arg) {
+    if (arg instanceof Uint8Array || arg instanceof ArrayBuffer) return arrayBufferToBase64(arg);
+    if (arg && typeof arg === 'object') return JSON.stringify(arg, Object.keys(arg).sort());
+    return String(arg);
+}
+function getSize(value) {
+    if (value instanceof ArrayBuffer) return value.byteLength;
+    if (value instanceof Uint8Array) return value.byteLength;
+    if (typeof value === 'string') return value.length * 2;
+    if (typeof value === 'object' && value !== null) {
+        return new TextEncoder().encode(JSON.stringify(value)).length;
+    }
+    return 0;
+}
+
+function cacheAsync(fn) {
+    const cache = new Map();
+    return async (...args) => {
+        const key = args.map(serializeArg).join('|');
+        const start = performance.now();
+        if (cache.has(key)) {
+            const result = await cache.get(key);
+            let totalUnits = 0;
+            for (const v of cache.values()) totalUnits += getSize(await v);
+            console.log(`[Cached - ${fn.name}]: ${performance.now() - start} ms, cache size: ${totalUnits} units`);
+            return result;
+        }
+        const promise = fn(...args);
+        cache.set(key, promise);
+        const result = await promise;
+        let totalUnits = 0;
+        for (const v of cache.values()) totalUnits += getSize(await v);
+        console.log(`[Executed - ${fn.name}]: ${performance.now() - start} ms, cache size: ${totalUnits} units`);
+        return result;
+    };
+}
+
 function buf2hex(buffer) {
   return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
 }
@@ -9,6 +46,7 @@ async function sha256(message) {
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
   return buf2hex(hashBuffer);
 }
+sha256 = cacheAsync(sha256)
 
 function base64EncodeUnicode(str) {
   return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m, p1) =>
@@ -61,6 +99,7 @@ async function deriveKey(password, salt) {
     ['encrypt', 'decrypt']
   );
 }
+deriveKey = cacheAsync(deriveKey);
 
 async function encryptText(plainText, password) {
   const encoder = new TextEncoder();
@@ -97,6 +136,7 @@ async function decryptText(encryptedData, password) {
     throw new Error("Invalid password or corrupted data");
   }
 }
+decryptText = cacheAsync(decryptText);
 
 async function generateOTP(keyObj) {
     const digits = keyObj.digits;
