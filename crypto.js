@@ -50,7 +50,7 @@ sha256 = cacheAsync(sha256)
 
 function base64EncodeUnicode(str) {
   return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (m, p1) =>
-    String.fromCharCode(parseInt(p1, 16))
+    String.fromCharCode(Number.parseInt(p1, 16))
   ));
 }
 
@@ -193,7 +193,7 @@ function base32ToUint8Array(base32) {
   }
 
   for (let i = 0; i + 8 <= bits.length; i += 8) {
-    output.push(parseInt(bits.substring(i, i + 8), 2));
+    output.push(Number.parseInt(bits.substring(i, i + 8), 2));
   }
 
   return new Uint8Array(output);
@@ -210,7 +210,7 @@ function base64ToBase32(base64) {
 
     for (let i = 0; i < bits.length; i += 5) {
         const chunk = bits.substring(i, i + 5);
-        base32 += alphabet[parseInt(chunk.padEnd(5, '0'), 2)];
+        base32 += alphabet[Number.parseInt(chunk.padEnd(5, '0'), 2)];
     }
 
     return base32;

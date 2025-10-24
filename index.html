@@ -131,7 +131,7 @@ const settings = {
 		type: "checkbox",
 		default: true,
 		onChange: async (value) => {
-			if (!value && window.location.protocol !== 'file:') {
+			if (!value && globalThis.location.protocol !== 'file:') {
 				const confirmDisable = await customPrompt('Warning! Disabling offline mode can expose your data to arbitrary code if hosted externally and the environment compromised. Type "yes" to confirm.', 0, 0);
 				if (confirmDisable?.trim().toLowerCase() !== 'yes') return false;
 			}
@@ -149,7 +149,7 @@ const settings = {
 			if (value) {
 				updateURL();
 			} else {
-				history.replaceState(null, "", window.location.origin + window.location.pathname + window.location.search);
+				history.replaceState(null, "", globalThis.location.origin + globalThis.location.pathname + globalThis.location.search);
 			}
 		}
 	},
@@ -617,7 +617,7 @@ function renderMasterKeysTable() {
 			}
 		});
 		tr.appendChild(tdMasterKey);
-		const hashToDisplay = window.innerWidth < 768 ? mk.hash.slice(0, 15) + "..." : mk.hash;
+		const hashToDisplay = globalThis.innerWidth < 768 ? mk.hash.slice(0, 15) + "..." : mk.hash;
 		const tdHash = document.createElement("td");
 		tdHash.textContent = hashToDisplay;
 		tr.appendChild(tdHash);
@@ -960,13 +960,13 @@ function initEventListeners() {
 		localStorage.removeItem("authKeys");
 		localStorage.removeItem("masterKeys");
 		localStorage.removeItem("masterKeysEncKeyHash");
-		history.replaceState(null, "", window.location.pathname);
+		history.replaceState(null, "", globalThis.location.pathname);
 		sessionEncKey = null;
 		loadKeys();
 		loadMasterKeys();
 		renderKeys();
 	});
-	window.addEventListener("click", function(event) {
+	globalThis.addEventListener("click", function(event) {
 		const modals = [{
 			element: document.getElementById("manageMasterModal"),
 			closeFunction: () => closeModal("manageMasterModal")
@@ -1106,8 +1106,8 @@ function addKeyFromQRText(qrText) {
 	const urlParams = new URLSearchParams(queryString);
 	const secret = urlParams.get('secret');
 	const issuer = urlParams.get('issuer') || '';
-	const digits = parseInt(urlParams.get('digits')) || 6;
-	const period = parseInt(urlParams.get('period')) || 30;
+	const digits = Number.parseInt(urlParams.get('digits')) || 6;
+	const period = Number.parseInt(urlParams.get('period')) || 30;
 	const algorithm = urlParams.get('algorithm') || 'SHA1';
 
 	const keyOptions = prepareKey({
@@ -1310,7 +1310,7 @@ async function chooseMasterKey() {
 			const options = masterKeys.map(
 				(mk, idx) => (idx + 1) + ": " + mk.hash.substring(0, 6) + "..." + " (" + mk.password.substring(0, 4) + "...)").join("\n");
 			const choice = await prompt("Choose a master key for encryption:\n0. Add new master key\n" + options);
-			const index = parseInt(choice) - 1;
+			const index = Number.parseInt(choice) - 1;
 			if (index >= 0 && index < masterKeys.length) {
 				return masterKeys[index];
 			} else if (index === masterKeys.length) {
@@ -1372,11 +1372,11 @@ function startOTPUpdater() {
 			if (!keyObj) return;
 
 			const progressEl = card.querySelector(".progress-fill");
-			const periodSec = progressEl ? parseFloat(progressEl.dataset.period) || 30 : 30;
+			const periodSec = progressEl ? Number.parseFloat(progressEl.dataset.period) || 30 : 30;
 			const periodMs = periodSec * 1000;
 
 			const timeStep = Math.floor(now / periodMs);
-			if (parseInt(card.dataset.lastStep) !== timeStep) {
+			if (Number.parseInt(card.dataset.lastStep) !== timeStep) {
 				updateKeyCard(keyObj);
 				card.dataset.lastStep = timeStep;
 			}

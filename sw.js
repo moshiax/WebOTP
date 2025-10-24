@@ -1,9 +1,9 @@
 let offlineMode = true;
 const swPrefix = '[ServiceWorker]';
-['log','warn','error'].forEach(fn => {
+for (const fn of ['log', 'warn', 'error']) {
     const orig = console[fn];
     console[fn] = (...args) => orig(swPrefix, ...args);
-});
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

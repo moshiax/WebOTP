@@ -6,7 +6,7 @@ function updateURL() {
     if (!config.get("updateURL")) return;
 
     if (!keys || keys.length === 0) {
-        history.replaceState(null, "", window.location.origin + window.location.pathname);
+        history.replaceState(null, "", globalThis.location.origin + globalThis.location.pathname);
         return;
     }
 
@@ -14,14 +14,14 @@ function updateURL() {
 
     const data = JSON.stringify(keysForURL);
     const base64Data = base64EncodeUnicode(data);
-    const newURL = window.location.origin + window.location.pathname + "#keys=" + base64Data;
+    const newURL = globalThis.location.origin + globalThis.location.pathname + "#keys=" + base64Data;
     history.replaceState(null, "", newURL);
 }
 
 function getKeysFromURL() {
-    if (window.location.hash.startsWith("#keys=")) {
+    if (globalThis.location.hash.startsWith("#keys=")) {
         try {
-            return JSON.parse(base64DecodeUnicode(window.location.hash.substring(6)));
+            return JSON.parse(base64DecodeUnicode(globalThis.location.hash.substring(6)));
         } catch (e) {
             console.error("Error reading keys from URL:", e);
         }
@@ -46,7 +46,7 @@ n.style.display = "none";
   }, 2300);
 }
 
-window.alert = function (message) {
+globalThis.alert = function (message) {
   showNotification(message);
 };
 
@@ -120,7 +120,7 @@ function customPrompt(text, isPassword = 0, noEscape = 0) {
   });
 }
 
-window.prompt = customPrompt;
+globalThis.prompt = customPrompt;
 
 document.getElementById('customPromptInput').addEventListener('input', function() {
   document.getElementById('customPromptOk').disabled = !this.value.trim();
