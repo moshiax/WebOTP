@@ -14,7 +14,7 @@
 	</header>
 	<main>
 <div id="keysContainer"></div>
-<div class="buttonContainer">
+<div class="buttonContainer" style="display:none;">
   <button id="addKeyUIBtn" onclick="openModal('addKeyUIModal')">Add Key</button>
   <button class="addMasterKeyBtn" onclick="addMasterKey()">Add master key</button>
   <button id="managesecretKeysBtn" onclick="openManagesecretKeysModal()">My secret keys</button>
@@ -484,16 +484,11 @@ function createKeyCard(keyObj) {
 	return card;
 }
 
-function renderKeys() {
-	const container = document.getElementById("keysContainer");
-	container.innerHTML = "";
-	const fragment = document.createDocumentFragment();
-	keys.forEach(keyObj => {
-		const card = createKeyCard(keyObj);
-		fragment.appendChild(card);
-	});
-
-	container.appendChild(fragment);
+async function renderKeys() {
+    for (const keyObj of keys) {
+        appendKeyCard(keyObj);
+        await new Promise(requestAnimationFrame);
+    }
 }
 
 function appendKeyCard(keyObj) {
@@ -1396,9 +1391,10 @@ function startOTPUpdater() {
 async function init() {
 	loadKeys();
 	await loadMasterKeys();
-	renderKeys();
 	startOTPUpdater();
+	renderKeys();
 	initEventListeners();
+	document.querySelector('.buttonContainer').style.display = 'flex';
 }
 document.addEventListener("DOMContentLoaded", init);
 
