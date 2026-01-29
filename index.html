@@ -119,6 +119,40 @@
 <script src ="essentials.js"></script>
 <script src="crypto.js"></script>
 <script src="external/jsQR.js"></script>
+<template id="key-card-template">
+	<div class="key-card">
+		<div class="progress-line" style="position:absolute; top:0; left:0; height:2%; width:100%; background:#161b22;">
+			<div class="progress-fill"></div>
+		</div>
+
+		<button class="delete-btn" title="Delete this key">&times;</button>
+
+		<div class="public-values">
+			<div class="title">
+				<strong>Name:</strong>
+				<span class="account-name" contenteditable="true" spellcheck="false"></span>
+			</div>
+
+			<div class="issuer" style="display:none;">
+				<strong>Issuer:</strong>
+				<span class="issuer-value"></span>
+			</div>
+
+			<div class="otp">
+				<strong>OTP:</strong>
+				<span class="otp-value">N/A</span>
+			</div>
+
+			<div class="status-wrapper">
+				<div class="status-container">
+					<strong>Status:</strong>
+					<span class="status">Unknown</span>
+				</div>
+			</div>
+		</div>
+	</div>
+</template>
+
 <script>
 const settings = {
 	passwordHideOn: {
@@ -353,42 +387,9 @@ function showCopyModal(text) {
 	textarea.value = text;
 	modal.style.display = "flex";
 }
-const keyCardTemplate = `
-<div class="key-card">
-  <div class="progress-line" style="
-	position:absolute; top:0; left:0; height:2%; width:100%;
-	background:#161b22; display:block;">
-	<div class="progress-fill" style="
-	  height:100%; width:0%; background:#58a6ff;"></div>
-  </div>
-
-  <button class="delete-btn" title="Delete this key">&times;</button>
-  <div class="public-values">
-	<div class="title">
-	  <strong>Name:</strong>
-	  <span class="account-name" data-key-id="" contenteditable="true" spellcheck="false"></span>
-	</div>
-	<div class="issuer" style="display:none;">
-	  <strong>Issuer:</strong>
-	  <span class="issuer-value"></span>
-	</div>
-	<div class="otp">
-	  <strong>OTP:</strong>
-	  <span class="otp-value" style="cursor:pointer;">N/A</span>
-	</div>
-	<div class="status-wrapper">
-	  <div class="status-container">
-		<strong>Status:</strong>
-		<span class="status" data-key-id="">Unknown</span>
-	  </div>
-	</div>
-  </div>
-</div>
-`;
 
 function createKeyCard(keyObj) {
-	const template = document.createElement("template");
-	template.innerHTML = keyCardTemplate.trim();
+	const template = document.getElementById("key-card-template");
 	const card = template.content.firstElementChild.cloneNode(true);
 	card.id = "key-" + keyObj.id;
 	otpObserver.observe(card);
