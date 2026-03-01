@@ -217,6 +217,17 @@ let keys = [];
 let masterKeysRevealed = false;
 let sessionEncKey = null;
 
+function sortKeysByOrder() {
+	keys.sort((a, b) => a.order - b.order);
+}
+
+function normalizeKeyOrders() {
+	sortKeysByOrder();
+	keys.forEach((keyObj, index) => {
+		keyObj.order = index + 1;
+	});
+}
+
 function loadKeys() {
 	let fromUrl = getKeysFromURL();
 	const stored = localStorage.getItem("authKeys");
@@ -227,18 +238,21 @@ function loadKeys() {
 		if (fromUrl) {
 			fromUrl.forEach(fk => {
 				const exists = keys.find(k => k.id === fk.id);
-				if (!exists) keys.push(prepareKey(fk));
+				if (!exists) keys.push(fk);
 			});
 		}
 
-		keys = keys.map(k => prepareKey(k));
+		const usedOrders = new Set();
+		keys = keys.map(k => prepareKey(k, { usedOrders }));
 
 	} else if (fromUrl) {
-		keys = fromUrl.map(k => prepareKey(k));
+		const usedOrders = new Set();
+		keys = fromUrl.map(k => prepareKey(k, { usedOrders }));
 	} else {
 		keys = [];
 	}
 
+	normalizeKeyOrders();
 	localStorage.setItem("authKeys", JSON.stringify(keys));
 	updateURL();
 }
@@ -381,10 +395,13 @@ function updateMasterEncryptionControls() {
 function deleteKey(keyObj) {
 	if (confirm("Are you sure you want to delete this key?")) {
 		keys = keys.filter((k) => k.id !== keyObj.id);
+		normalizeKeyOrders();
 		saveKeys();
-		const cardToDelete = document.getElementById("key-" + keyObj.id);
-		if (cardToDelete) {
-			cardToDelete.remove();
+		const card = document.getElementById("key-" + keyObj.id);
+		if (card) {
+			otpObserver.unobserve(card);
+			visibleCards.delete(card.id);
+			card.remove();
 		}
 		if (document.getElementById("managesecretKeysModal").style.display !== "none") {
 			rendersecretKeysTable();
@@ -402,7 +419,11 @@ function createKeyCard(keyObj) {
 	const template = document.getElementById("key-card-template");
 	const card = template.content.firstElementChild.cloneNode(true);
 	card.id = "key-" + keyObj.id;
+	card.draggable = true;
+	card.dataset.keyId = keyObj.id;
 	otpObserver.observe(card);
+	card.addEventListener("dragstart", handleCardDragStart);
+	card.addEventListener("dragend", handleCardDragEnd);
 
 	const delBtn = card.querySelector(".delete-btn");
 	delBtn.onclick = () => deleteKey(keyObj);
@@ -509,10 +530,47 @@ function createKeyCard(keyObj) {
 }
 
 async function renderKeys() {
+	sortKeysByOrder();
     for (const keyObj of keys) {
         appendKeyCard(keyObj);
         await new Promise(requestAnimationFrame);
     }
+}
+
+let draggedCardId = null;
+
+function handleCardDragStart(event) {
+	const card = event.currentTarget;
+	draggedCardId = card.dataset.keyId;
+	card.classList.add("dragging");
+	event.dataTransfer.effectAllowed = "move";
+	event.dataTransfer.setData("text/plain", draggedCardId);
+}
+
+function handleCardDragEnd(event) {
+	event.currentTarget.classList.remove("dragging");
+	persistCardOrder();
+	draggedCardId = null;
+}
+
+function persistCardOrder() {
+	const container = document.getElementById("keysContainer");
+	const orderedIds = [...container.querySelectorAll('.key-card')].map(card => card.dataset.keyId);
+	if (orderedIds.length !== keys.length) return;
+
+	const keyMap = new Map(keys.map(k => [k.id, k]));
+	const orderedKeys = orderedIds.map(id => keyMap.get(id)).filter(Boolean);
+	if (orderedKeys.length !== keys.length) return;
+
+	keys = orderedKeys;
+	keys.forEach((keyObj, index) => {
+		keyObj.order = index + 1;
+	});
+	saveKeys();
+
+	if (document.getElementById("managesecretKeysModal").style.display !== "none") {
+		rendersecretKeysTable();
+	}
 }
 
 function appendKeyCard(keyObj) {
@@ -828,6 +886,20 @@ function decryptKey(keyObj, mk) {
 function prepareKey(keyObj, options = {}) {
 	let accountName = keyObj.accountName || keyObj.title || "Unknown";
 	let issuer = keyObj.issuer || "Unknown";
+	const usedOrders = options.usedOrders || new Set(
+		keys
+			.filter(k => k.id !== keyObj.id && Number.isInteger(k.order) && k.order > 0)
+			.map(k => k.order)
+	);
+
+	let order = Number.parseInt(keyObj.order, 10);
+	if (!Number.isInteger(order) || order <= 0 || usedOrders.has(order)) {
+		order = 1;
+		while (usedOrders.has(order)) {
+			order += 1;
+		}
+	}
+	usedOrders.add(order);
 
 	if (issuer && accountName.startsWith(issuer + ":")) {
 		accountName = accountName.slice((issuer + ":").length);
@@ -836,6 +908,7 @@ function prepareKey(keyObj, options = {}) {
 
 	const KeyObj = { 
 		id: keyObj.id,
+		order,
 		accountName,
 		encryptedKey: keyObj.encryptedKey,
 		masterKeyHash: keyObj.masterKeyHash || keyObj.encryptionHash,
@@ -934,7 +1007,12 @@ async function processImport(input) {
 	}
 
 	try {
-		let newKeys = combined.keys ? combined.keys.map(k => prepareKey(k, { shortImport: false })) : [];
+		const usedOrders = new Set(
+			keys
+				.filter(k => Number.isInteger(k.order) && k.order > 0)
+				.map(k => k.order)
+		);
+		let newKeys = combined.keys ? combined.keys.map(k => prepareKey(k, { shortImport: false, usedOrders })) : [];
 
 		newKeys.forEach(newKey => {
 			const existingKey = keys.find(k => k.id === newKey.id);
@@ -943,10 +1021,20 @@ async function processImport(input) {
 					existingKey.accountName = newKey.accountName;
 					updateKeyCard(existingKey).catch(err => console.error(`Error updating key card id=${existingKey.id}:`, err));
 				}
+				existingKey.order = newKey.order;
 			} else {
 				keys.push(newKey);
 				appendKeyCard(newKey);
 			}
+		});
+
+		normalizeKeyOrders();
+		sortKeysByOrder();
+
+		const container = document.getElementById("keysContainer");
+		keys.forEach(keyObj => {
+			const card = document.getElementById("key-" + keyObj.id);
+			if (card) container.appendChild(card);
 		});
 
 		await saveKeys();
@@ -982,7 +1070,42 @@ async function processImport(input) {
 // Init and Event Listeners
 // ================================
 
+function handleKeysContainerDragOver(event) {
+	event.preventDefault();
+	event.dataTransfer.dropEffect = "move";
+
+	const container = event.currentTarget;
+	const draggingCard = container.querySelector('.key-card.dragging');
+	if (!draggingCard) return;
+
+	let nearest = null;
+	let nearestOffset = Number.NEGATIVE_INFINITY;
+	const cards = [...container.querySelectorAll('.key-card:not(.dragging)')];
+
+	cards.forEach(card => {
+		const box = card.getBoundingClientRect();
+		const offset = event.clientY - box.top - (box.height / 2);
+		if (offset < 0 && offset > nearestOffset) {
+			nearestOffset = offset;
+			nearest = card;
+		}
+	});
+
+	if (!nearest) {
+		container.appendChild(draggingCard);
+	} else if (nearest !== draggingCard) {
+		container.insertBefore(draggingCard, nearest);
+	}
+}
+
 function initEventListeners() {
+	const keysContainer = document.getElementById("keysContainer");
+	keysContainer.addEventListener("dragover", handleKeysContainerDragOver);
+	keysContainer.addEventListener("drop", (event) => {
+		event.preventDefault();
+		persistCardOrder();
+	});
+
 	document.getElementById("copyButton").addEventListener("click", async function() {
 		const textarea = document.getElementById("copyTextArea");
 		try {
@@ -1004,6 +1127,9 @@ function initEventListeners() {
 		sessionEncKey = null;
 		loadKeys();
 		loadMasterKeys();
+		const container = document.getElementById("keysContainer");
+		container.innerHTML = "";
+		visibleCards.clear();
 		renderKeys();
 	});
 	globalThis.addEventListener("click", function(event) {
@@ -1337,6 +1463,7 @@ async function addKey(accountName, keyValue, masterKey, options = {}) {
 	let keyObj = {
 		id: id,
 		accountName: accountName,
+		order: options.order,
 		encryptedKey: encrypted,
 		masterKeyHash: masterKey.hash,
 		issuer: options.issuer,

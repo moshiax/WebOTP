@@ -110,6 +110,16 @@ main { padding: var(--padding-medium); }
 	padding: var(--padding-medium);
 	margin-bottom: var(--padding-medium);
 	position: relative;
+	cursor: grab;
+	transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.key-card.dragging {
+	opacity: 1;
+	cursor: grabbing;
+	outline: 1px dashed var(--color-switch-active);
+	box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+	transform: scale(1.01);
 }
 
 .key-card .progress-line {
