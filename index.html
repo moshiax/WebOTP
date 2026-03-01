@@ -177,6 +177,14 @@ const settings = {
 			});
 		}
 	},
+	showNextOTP: {
+		label: "Show next OTP code (offset +1)",
+		type: "checkbox",
+		default: true,
+		afterChange: () => {
+			keys.forEach(keyObj => updateKeyCard(keyObj));
+		}
+	},
 	updateURL: {
 		label: "Encode secretkeys in current url hash",
 		type: "checkbox",
@@ -455,11 +463,24 @@ function createKeyCard(keyObj) {
 
 	const otpSpan = card.querySelector(".otp-value");
 	otpSpan.id = "otp-" + keyObj.id;
-	otpSpan.addEventListener("click", function() {
-		if (/^\d{6}$/.test(this.textContent)) {
-			navigator.clipboard.writeText(this.textContent).then(() => alert("OTP copied!")).catch(e => alert("Copy failed: " + e.message));
-		}
+
+	otpSpan.addEventListener("click", () => {
+		const text = otpSpan.textContent.trim();
+		if (text) navigator.clipboard.writeText(text).then(() => alert("Current OTP copied!"));
 	});
+
+	const nextOtpSpan = document.createElement("span");
+	nextOtpSpan.className = "otp-next-value";
+	nextOtpSpan.id = "otp-next-" + keyObj.id;
+	nextOtpSpan.style.opacity = "0.75";
+	otpSpan.insertAdjacentElement("afterend", nextOtpSpan);
+
+	if (nextOtpSpan) {
+		nextOtpSpan.addEventListener("click", () => {
+			const text = nextOtpSpan.textContent.replace(/^ *\/ */, '').trim();
+			if (text) navigator.clipboard.writeText(text).then(() => alert("Next OTP copied!"));
+		});
+	}
 
 	const statusSpan = card.querySelector(".status");
 	statusSpan.id = "status-" + keyObj.id;
@@ -733,8 +754,14 @@ function getMatchingMasterKey(keyObj) {
 
 async function updateKeyCard(keyObj) {
 	const otpSpan = document.getElementById("otp-" + keyObj.id);
+	const nextOtpSpan = document.getElementById("otp-next-" + keyObj.id);
 	const statusSpan = document.getElementById("status-" + keyObj.id);
 	const titleSpan = document.querySelector(`.account-name[data-key-id="${keyObj.id}"]`);
+	const showNextOTP = config.get("showNextOTP");
+
+	if (nextOtpSpan) {
+		nextOtpSpan.style.display = showNextOTP ? "inline" : "none";
+	}
 
 	if (titleSpan) titleSpan.textContent = keyObj.accountName;
 
@@ -742,21 +769,36 @@ async function updateKeyCard(keyObj) {
 
 	if (!mk) {
 		otpSpan.textContent = "N/A";
+		if (nextOtpSpan) nextOtpSpan.textContent = "";
 		statusSpan.textContent = "Encrypted";
 		statusSpan.className = "status status-encrypted";
 		return;
 	}
 
 	try {
+		const secret = await decryptText(keyObj.encryptedKey, mk.password);
+
 		const otp = await generateOTP({
 			...keyObj,
-			secret: await decryptText(keyObj.encryptedKey, mk.password)
+			secret
 		});
 		otpSpan.textContent = otp;
+
+		if (showNextOTP && nextOtpSpan) {
+			const nextOtp = await generateOTP({
+				...keyObj,
+				secret
+			}, 1);
+			nextOtpSpan.textContent = ` / ${nextOtp}`;
+		} else if (nextOtpSpan) {
+			nextOtpSpan.textContent = "";
+		}
+
 		statusSpan.textContent = "Decrypted";
 		statusSpan.className = "status status-decrypted";
 	} catch (err) {
 		otpSpan.textContent = "N/A";
+		if (nextOtpSpan) nextOtpSpan.textContent = "";
 		statusSpan.textContent = "Decryption error";
 		statusSpan.className = "status status-failed";
 		console.error(`Error decrypting keyObj id=${keyObj.id}:`, err);
