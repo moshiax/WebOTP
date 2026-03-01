@@ -35,7 +35,7 @@ function getKeysFromURL() {
 
 function showNotification(message) {
 	const n = document.getElementById("notification");
-	n.querySelector("p").innerHTML = message;
+	n.querySelector("p").textContent = String(message);
 	n.style.display = "block";
 	n.style.animation = "fadeIn 0.5s ease-in-out";
 	setTimeout(() => {

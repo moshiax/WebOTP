@@ -1531,16 +1531,18 @@ async function chooseMasterKey() {
 	}
 }
 
-async function addMasterKey() {
-	const input = await prompt("Enter master key:", 1);
-	if (!input) return;
+async function addMasterKey(masterKey) {
+	if (!masterKey) {
+		masterKey = await prompt("Enter master key:", 1);
+		if (!masterKey) return;
+	}
 
-	const hash = await sha256(input);
+	const hash = await sha256(masterKey);
 	if (masterKeys.some(mk => mk.hash === hash)) {
 		return;
 	}
 
-	masterKeys.push({ password: input, hash: hash });
+	masterKeys.push({ password: masterKey, hash: hash });
 	await saveMasterKeys();
 
 	keys.forEach(keyObj => {
