@@ -1,15 +1,15 @@
 {
-  "short_name": "WebOTP",
-  "name": "WebOTP",
-  "icons": [
-    {
-      "src": "icon.png",
-      "sizes": "480x480",
-      "type": "image/png"
-    }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#161b22"
+	"short_name": "WebOTP",
+	"name": "WebOTP",
+	"icons": [
+		{
+			"src": "icon.png",
+			"sizes": "480x480",
+			"type": "image/png"
+		}
+	],
+	"start_url": ".",
+	"display": "standalone",
+	"background_color": "#0d1117",
+	"theme_color": "#161b22"
 }
